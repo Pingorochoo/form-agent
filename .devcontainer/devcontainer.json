@@ -1,0 +1,7 @@
+{
+  "name": "form-agent-dev",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "node"
+}
