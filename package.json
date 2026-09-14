@@ -1,0 +1,40 @@
+{
+  "name": "form-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic-first, AI-assisted Google Forms analysis and authorized test automation. Phase 0 scaffolding.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "form-agent": "./bin/form-agent.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/src/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "fixture:sanitize": "node scripts/sanitize-observed-form.mjs",
+    "fixture:decode": "node scripts/decode-observed-form.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "commander": "^13.1.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.4"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.2": true
+  }
+}

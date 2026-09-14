@@ -1,0 +1,468 @@
+{
+  "title": "Evaluación de experiencia y preferencias del estudiante",
+  "description": "Este formulario tiene como finalidad evaluar la experiencia de los estudiantes en relación con sus actividades académicas, organización del tiempo y satisfacción. Algunas preguntas serán utilizadas para probar diferentes tipos de respuesta y la navegación entre secciones.",
+  "generatorVersion": "phase0-research",
+  "embeddedShape": {
+    "payloadTopLevelLength": 20,
+    "formArrayLength": 26,
+    "itemCount": 32,
+    "itemIndices": {
+      "id": 0,
+      "title": 1,
+      "description": 2,
+      "type": 3,
+      "questionGroup": 4
+    },
+    "questionGroupIndices": {
+      "entryId": 0,
+      "choices": 1,
+      "requiredFlag": 2,
+      "rowLabelOrPlaceholder": 3
+    },
+    "gridRows": "g[4..n]: one tuple per row [rowId, choices, requiredFlag, rowLabel, ...]"
+  },
+  "typeCodeToKind": {
+    "0": "text",
+    "1": "paragraph-text",
+    "2": "single-choice",
+    "3": "dropdown",
+    "4": "multi-choice",
+    "5": "linear-scale",
+    "6": "section-break",
+    "7": "multiple-choice-grid",
+    "9": "date",
+    "10": "time",
+    "13": "file-upload",
+    "18": "rating"
+  },
+  "sections": [
+    {
+      "id": "1249846430",
+      "title": "Datos generales",
+      "description": "Completa la siguiente información. Las preguntas marcadas como obligatorias deben responderse.",
+      "questionIds": [
+        "1768533602",
+        "1307724388",
+        "185285285",
+        "81510332",
+        "1240080904"
+      ]
+    },
+    {
+      "id": "336245140",
+      "title": "Experiencia académica presencial sin título",
+      "description": "Responde pensando principalmente en tu experiencia en clases presenciales.",
+      "questionIds": [
+        "1363168754",
+        "215989038",
+        "1680754316",
+        "2017386037",
+        "516057794",
+        "1969726133"
+      ]
+    },
+    {
+      "id": "1142924921",
+      "title": "Experiencia académica virtual",
+      "description": "Responde pensando principalmente en tu experiencia con clases o actividades virtuales.",
+      "questionIds": [
+        "176568645",
+        "780007956",
+        "1161579616",
+        "959539122",
+        "1890094526",
+        "16934429",
+        "759854928"
+      ]
+    },
+    {
+      "id": "21510676",
+      "title": "Organización y satisfacción",
+      "description": "Esta sección es común para todos los participantes, independientemente de la ruta seleccionada.",
+      "questionIds": [
+        "1344142663",
+        "151469523",
+        "370988481",
+        "1536986917",
+        "1478815747"
+      ]
+    },
+    {
+      "id": "1860209072",
+      "title": "Comentarios finales",
+      "description": "Últimas preguntas. Puedes expresar libremente tu opinión.",
+      "questionIds": [
+        "1408676108",
+        "783078409",
+        "1992042423",
+        "1834773003"
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "1768533602",
+      "sectionId": "1249846430",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "Nombre o código del participante"
+    },
+    {
+      "id": "1307724388",
+      "sectionId": "1249846430",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "Edad"
+    },
+    {
+      "id": "185285285",
+      "sectionId": "1249846430",
+      "kind": "date",
+      "rawType": 9,
+      "required": false,
+      "title": "Fecha de nacimiento",
+      "validationHints": {
+        "dateFlags": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": "81510332",
+      "sectionId": "1249846430",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "¿En qué ciclo académico te encuentras?"
+    },
+    {
+      "id": "1240080904",
+      "sectionId": "1249846430",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "¿Cuál es tu modalidad principal de estudio?"
+    },
+    {
+      "id": "1363168754",
+      "sectionId": "336245140",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "¿Cuántas horas aproximadamente dedicas al estudio fuera de clases por semana?"
+    },
+    {
+      "id": "215989038",
+      "sectionId": "336245140",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "¿Qué aspectos valoras más de tus clases presenciales?"
+    },
+    {
+      "id": "1680754316",
+      "sectionId": "336245140",
+      "kind": "linear-scale",
+      "rawType": 5,
+      "required": false,
+      "title": "¿Cómo calificarías tu experiencia general en las clases presenciales? 1 muy malo - 5 excelente",
+      "choices": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ]
+    },
+    {
+      "id": "2017386037",
+      "sectionId": "336245140",
+      "kind": "linear-scale",
+      "rawType": 5,
+      "required": false,
+      "title": "¿Qué tan satisfecho estás con la interacción con tus compañeros?1 muy malo - 5 excelente",
+      "choices": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ]
+    },
+    {
+      "id": "516057794",
+      "sectionId": "336245140",
+      "kind": "time",
+      "rawType": 10,
+      "required": false,
+      "title": "¿A qué hora normalmente estudias después de clases?",
+      "validationHints": {
+        "timeFlags": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "1969726133",
+      "sectionId": "336245140",
+      "kind": "multiple-choice-grid",
+      "rawType": 7,
+      "required": false,
+      "title": "Indica qué tan de acuerdo estás con las siguientes afirmaciones.",
+      "choices": [
+        "Totalmente en desacuerdo",
+        "En desacuerdo",
+        "Ni de acuerdo ni en desacuerdo",
+        "De acuerdo",
+        "Totalmente de acuerdo"
+      ],
+      "rowLabels": [
+        "Puedo concentrarme durante las clases.",
+        "Comprendo las explicaciones del docente.",
+        "Participo activamente en clase.",
+        "Me siento cómodo trabajando con mis compañeros."
+      ],
+      "selectionMode": "single"
+    },
+    {
+      "id": "176568645",
+      "sectionId": "1142924921",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "¿Cuántas horas aproximadamente dedicas al estudio virtual por semana?"
+    },
+    {
+      "id": "780007956",
+      "sectionId": "1142924921",
+      "kind": "multi-choice",
+      "rawType": 4,
+      "required": false,
+      "title": "¿Qué herramientas utilizas con mayor frecuencia para estudiar?",
+      "choices": [
+        "Google Meet",
+        "Zoom",
+        "Google Classroom",
+        "YouTube",
+        "WhatsApp",
+        "Documentos digitales"
+      ]
+    },
+    {
+      "id": "1161579616",
+      "sectionId": "1142924921",
+      "kind": "linear-scale",
+      "rawType": 5,
+      "required": false,
+      "title": "¿Cómo calificarías tu experiencia general con las clases virtuales?\n1muy mala–5 excelente",
+      "choices": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ]
+    },
+    {
+      "id": "959539122",
+      "sectionId": "1142924921",
+      "kind": "linear-scale",
+      "rawType": 5,
+      "required": false,
+      "title": "¿Qué tan satisfecho estás con la comunicación virtual con tus compañeros?1muy mala–5 excelente",
+      "choices": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ]
+    },
+    {
+      "id": "1890094526",
+      "sectionId": "1142924921",
+      "kind": "time",
+      "rawType": 10,
+      "required": false,
+      "title": "¿A qué hora normalmente realizas tus actividades virtuales?",
+      "validationHints": {
+        "timeFlags": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "16934429",
+      "sectionId": "1142924921",
+      "kind": "multi-choice",
+      "rawType": 4,
+      "required": false,
+      "title": "Selecciona las actividades virtuales que realizas con frecuencia.",
+      "choices": [
+        "Ver clases grabadas",
+        "Participar en videollamadas",
+        "Realizar trabajos grupales",
+        "Leer documentos",
+        "Resolver cuestionarios",
+        "Investigar información"
+      ]
+    },
+    {
+      "id": "759854928",
+      "sectionId": "1142924921",
+      "kind": "multiple-choice-grid",
+      "rawType": 7,
+      "required": false,
+      "title": "Indica qué tan de acuerdo estás con las siguientes afirmaciones.",
+      "choices": [
+        "Totalmente en desacuerdo",
+        "En desacuerdo",
+        "Neutral",
+        "De acuerdo",
+        "Totalmente de acuerdo"
+      ],
+      "rowLabels": [
+        "Tengo facilidad para organizar mis actividades virtuales.",
+        "Comprendo las indicaciones de los trabajos.",
+        "Puedo mantener mi concentración.",
+        "Tengo facilidad para comunicarme con mis compañeros."
+      ],
+      "selectionMode": "single"
+    },
+    {
+      "id": "1344142663",
+      "sectionId": "21510676",
+      "kind": "text",
+      "rawType": 0,
+      "required": false,
+      "title": "  ¿Cuántas horas duermes aproximadamente durante un día normal?  "
+    },
+    {
+      "id": "151469523",
+      "sectionId": "21510676",
+      "kind": "multi-choice",
+      "rawType": 4,
+      "required": false,
+      "title": "¿Qué actividades realizas además de estudiar?",
+      "choices": [
+        "Trabajo",
+        "Deporte",
+        "Actividades familiares",
+        "Hobbies",
+        "Actividades sociales",
+        "Ninguna"
+      ]
+    },
+    {
+      "id": "370988481",
+      "sectionId": "21510676",
+      "kind": "linear-scale",
+      "rawType": 5,
+      "required": false,
+      "title": "¿Qué tan satisfecho estás actualmente con tu organización del tiempo? 1 nada satisfecho- 5 muy satisfecho",
+      "choices": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ]
+    },
+    {
+      "id": "1536986917",
+      "sectionId": "21510676",
+      "kind": "multiple-choice-grid",
+      "rawType": 7,
+      "required": false,
+      "title": "  Ordena mentalmente qué aspecto consideras más importante para tener una buena experiencia académica.  ",
+      "choices": [
+        "Muy importante",
+        "Importante",
+        "Poco importante",
+        "Nada importante"
+      ],
+      "rowLabels": [
+        "Organización personal",
+        "Calidad docente",
+        "Compañeros",
+        "Materiales",
+        "Tecnología"
+      ],
+      "selectionMode": "single"
+    },
+    {
+      "id": "1478815747",
+      "sectionId": "21510676",
+      "kind": "multiple-choice-grid",
+      "rawType": 7,
+      "required": false,
+      "title": "Qué elementos consideras que influyen en tu satisfacción académica?",
+      "choices": [
+        "Motivación",
+        "Concentración",
+        "Rendimiento",
+        "Satisfacción"
+      ],
+      "rowLabels": [
+        "Docentes",
+        "Compañeros",
+        "Horarios",
+        "Infraestructura",
+        "Tecnología"
+      ],
+      "selectionMode": "single"
+    },
+    {
+      "id": "1408676108",
+      "sectionId": "1860209072",
+      "kind": "paragraph-text",
+      "rawType": 1,
+      "required": true,
+      "title": "¿Qué es lo que más te gusta de tu experiencia académica?"
+    },
+    {
+      "id": "783078409",
+      "sectionId": "1860209072",
+      "kind": "paragraph-text",
+      "rawType": 1,
+      "required": true,
+      "title": "¿Qué aspecto consideras que debería mejorar?"
+    },
+    {
+      "id": "1992042423",
+      "sectionId": "1860209072",
+      "kind": "paragraph-text",
+      "rawType": 1,
+      "required": true,
+      "title": "Si pudieras cambiar una cosa de tu experiencia como estudiante, ¿Qué cambiarías?"
+    },
+    {
+      "id": "1834773003",
+      "sectionId": "1860209072",
+      "kind": "single-choice",
+      "rawType": 2,
+      "required": true,
+      "title": "¿Recomendarías tu modalidad de estudio a otro estudiante?",
+      "choices": [
+        "Sí",
+        "No",
+        "Tal vez"
+      ]
+    }
+  ],
+  "routingEvidence": {
+    "sectionIdOccurrences": {
+      "21510676": 1,
+      "336245140": 1,
+      "1142924921": 1,
+      "1249846430": 1,
+      "1860209072": 1
+    },
+    "anySectionIdAppearsMoreThanOnce": false,
+    "conditionalChoices": [],
+    "conditionalRoutingDetected": false
+  }
+}

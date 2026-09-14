@@ -1,0 +1,66 @@
+# form-agent configuration example.
+#
+# Precedence: env (FORM_AGENT_*, LOG_LEVEL) > this file > defaults.
+# Supported extensions: .json, .yaml, .yml, .ts (default-exported).
+#
+# TRUST: JSON/YAML are data-only (parsed then validated) and are the preferred
+# formats. A .ts config is TRUSTED EXECUTABLE CODE -- it is import()ed, so it
+# runs with this process's privileges and is NOT sandboxed. Only use a .ts
+# config you control and have reviewed; never one from an untrusted source.
+# See src/config/load.ts and docs/phase0.md ("Configuration safety").
+
+log:
+  # trace | debug | info | warn | error
+  level: info
+
+database:
+  # Relative paths are resolved against the cwd. Both are gitignored.
+  directory: .data
+  filename: form-agent.db
+
+llm:
+  defaultProvider: fake
+  temperature: 0.2
+  maxTokens: 2048
+  enableCaching: true
+  providers:
+    # The offline-safe deterministic provider. Always available; validates
+    # the ChatCompletionClient contract without any network.
+    fake:
+      type: fake
+      enabled: true
+    # Local OpenAI-compatible endpoint (Ollama / vLLM / LM Studio / llama.cpp).
+    # Wiring arrives in Phase 3 (moved earlier per the approved refinement).
+    local:
+      type: openai-compatible
+      baseUrl: http://localhost:11434/v1
+      apiKeyEnv: OPENAI_API_KEY   # optional for local servers
+      model: llama3.2:3b
+      timeoutMs: 60000
+      enabled: false
+    # Cloud fallback stays optional and may be added later (approved).
+    #openai-cloud:
+    #  type: openai-compatible
+    #  baseUrl: https://api.openai.com/v1
+    #  apiKeyEnv: OPENAI_API_KEY
+    #  model: gpt-4o-mini
+    #  timeoutMs: 60000
+    #  enabled: false
+
+analyze:
+  # Phase 1+ reads these; currently informational.
+  maxAnswerPerQuestion: 20
+  batchMaxSize: 10
+
+run:
+  concurrency: 1
+  autoApprove: false
+
+forms:
+  # Form allowlist (authorization: strong). Fixture harness URLs are safe to
+  # include; live Google Forms URLs must be added explicitly by an operator.
+  allowlist:
+    - "https://fixtures.local/forms/*"
+
+telegram:
+  enabled: false

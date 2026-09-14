@@ -1,0 +1,163 @@
+/**
+ * Command handlers — Phase 0 scaffolding.
+ *
+ * Only `provider` is functional (config + fake provider connectivity). The
+ * analysis/policy/execution commands have no implementation yet and return a
+ * stable `not-implemented` signal rather than pretending to work.
+ */
+
+import type { AppConfig } from '../config/schema.ts';
+import { resolveProviderConfig } from '../config/load.ts';
+import type { ChatCompletionClient } from '../llm/interface.ts';
+import { FakeProvider } from '../llm/fake.ts';
+import type { Logger } from '../logging/logger.ts';
+import { ExitCodes } from './exit-codes.ts';
+
+export class NotImplementedError extends Error {
+  constructor(command: string) {
+    super(`${command} is not implemented yet (Phase 0 scaffolding)`);
+    this.name = 'NotImplementedError';
+  }
+}
+
+export interface CliContext {
+  config: AppConfig;
+  logger: Logger;
+}
+
+function notImplemented(command: string): never {
+  throw new NotImplementedError(command);
+}
+
+function makeCliSink(): (line: string) => void {
+  return (line) => process.stdout.write(`${line}\n`);
+}
+
+/**
+ * Resolve the configured LLM client for a provider id.
+ *
+ * `--validate`-style flows call this to prove the pipeline (config + resolve +
+ * connectivity) works. Phase 3 will build real openai-compatible clients; for
+ * now any non-fake provider that resolves config-wise also passes through the
+ * fake client so `provider <id> --validate` succeeds deterministically.
+ */
+export function createClientForProvider(
+  config: AppConfig,
+  providerId: string,
+): ChatCompletionClient {
+  const { config: providerConfig } = resolveProviderConfig(config, providerId);
+  if (providerConfig.type === 'fake') {
+    return new FakeProvider();
+  }
+  // Note: openai-compatible wiring arrives in Phase 3. For Phase 0 validation
+  // we hand back a fake client so the CLI contract is exercised end-to-end.
+  return new FakeProvider(`fake-${providerId}`);
+}
+
+export async function handleCmdAnalyze(
+  _url: string,
+  ctx: CliContext,
+): Promise<number> {
+  void ctx;
+  notImplemented('analyze');
+}
+
+export async function handleCmdFile(
+  _path: string,
+  ctx: CliContext,
+): Promise<number> {
+  void ctx;
+  notImplemented('file');
+}
+
+export async function handleCmdPreview(
+  ctx: CliContext,
+): Promise<number> {
+  void ctx;
+  notImplemented('preview');
+}
+
+export async function handleCmdPlan(
+  _url: string,
+  ctx: CliContext,
+): Promise<number> {
+  void ctx;
+  notImplemented('plan');
+}
+
+export async function handleCmdRun(
+  ctx: CliContext,
+): Promise<number> {
+  void ctx;
+  notImplemented('run');
+}
+
+export async function handleCmdProviderValidate(
+  providerId: string,
+  ctx: CliContext,
+): Promise<number> {
+  const logger = ctx.logger.child('provider');
+  const client = createClientForProvider(ctx.config, providerId);
+  logger.info(`Validating LLM provider "${providerId}"...`);
+  const connectivity = await client.checkConnectivity();
+  if (!connectivity.ok) {
+    logger.error(`Provider "${providerId}" connectivity check failed: ${connectivity.error ?? 'unknown error'}`);
+    await client.close();
+    return ExitCodes.LLM_CONNECTIVITY;
+  }
+  logger.info(
+    `Provider "${providerId}" is reachable (model: ${connectivity.model ?? 'unknown'}, ${connectivity.latencyMs ?? 0}ms)`,
+  );
+  const models = await client.listModels();
+  logger.debug(`Models available: ${models.join(', ')}`);
+  await client.close();
+  return ExitCodes.SUCCESS;
+}
+
+export async function handleCmdProviderWhere(ctx: CliContext): Promise<number> {
+  const logger = ctx.logger.child('provider');
+  const config = ctx.config;
+  const providers = config.llm.providers;
+  const defaultProvider = config.llm.defaultProvider;
+
+  for (const [id, providerConfig] of Object.entries(providers)) {
+    const flags: string[] = [];
+    if (id === defaultProvider) flags.push('default');
+    if (!providerConfig.enabled) flags.push('disabled');
+    if (providerConfig.type === 'fake') flags.push('offline-safe');
+    logger.info(`${id} (type=${providerConfig.type})${flags.length > 0 ? ` [${flags.join(', ')}]` : ''}${providerConfig.baseUrl !== undefined ? ` -> ${providerConfig.baseUrl}` : ''}`);
+  }
+
+  if (providers[defaultProvider] === undefined) {
+    logger.warn(`defaultProvider "${defaultProvider}" is not configured; add it under llm.providers`);
+  }
+  return ExitCodes.SUCCESS;
+}
+
+export async function handleCmdMetrics(ctx: CliContext): Promise<number> {
+  void ctx;
+  notImplemented('metrics');
+}
+
+export function handleCmdHelp(): number {
+  makeCliSink()(
+    [
+      'form-agent — deterministic-first, AI-assisted Google Forms testing CLI',
+      '',
+      'Usage:',
+      '  form-agent analyze <url>            Analyze a form (Phase 1)',
+      '  form-agent file <path>              File an update (scaffold)',
+      '  form-agent preview                  Preview answers before run (not implemented)',
+      '  form-agent plan <url>               Plan a batch (not implemented)',
+      '  form-agent run                       Run an approved batch (not implemented)',
+      '  form-agent provider <id> --validate  Check an LLM provider',
+      '  form-agent provider where           List configured providers',
+      '  form-agent metrics                  Show run metrics (not implemented)',
+      '  form-agent --version                Print version',
+      '  form-agent --help                   This help',
+      '',
+      'Exit codes: 0 success, 1 error, 2 usage, 3 validation, 4 LLM offline, 5 LLM connectivity, 127 unknown command',
+    ].join('\n'),
+  );
+  return ExitCodes.SUCCESS;
+}
