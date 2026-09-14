@@ -8,11 +8,21 @@
 | Item | Value |
 | --- | --- |
 | Phase 0 | **COMPLETE and ACCEPTED** |
-| Accepted baseline commit | `63b2c3e` — `feat: complete phase 0 foundation` |
-| Phase 1 | **NOT STARTED** |
-| Working tree at acceptance | **clean** (baseline commit contains all Phase 0 files) |
-| Tests | 95 passing across 10 files |
-| Typecheck / build | clean |
+| Phase 0 baseline | `63b2c3e` — `feat: complete phase 0 foundation` |
+| Phase 1 | **COMPLETE and ACCEPTED** |
+| Accepted implementation baseline | `309f097` — `feat: complete phase 1 structural analysis` |
+| Phase 2 | **NOT STARTED** |
+| Current phase spec | `docs/PHASE_2.md` |
+| Tests at Phase 1 acceptance | **162 passing across 16 files** |
+| Phase 1 targeted verification | **67 passing across 6 files** |
+| Typecheck / build | **clean** |
+| Working tree at Phase 1 acceptance | **clean** |
+
+Phase 2 planning documentation may be newer than the accepted implementation
+baseline. `309f097` remains the accepted code baseline until Phase 2 itself is
+implemented, independently reviewed, and committed.
+
+---
 
 ## Source of truth
 
@@ -24,139 +34,413 @@ If sources conflict, earlier items win:
 4. phase specifications (`docs/PHASE_N.md`)
 5. handoff documentation (this file)
 
-Do **not** reconstruct or re-audit Phase 0 unless concrete evidence requires it
-(a failing regression test, a direct interface conflict with the current phase,
-or repository evidence contradicting the documented baseline). The accepted
-baseline is recorded above so it can be verified, not re-derived.
+Do **not** broadly reconstruct, re-audit, or reimplement accepted Phase 0 or
+Phase 1 work.
+
+Inspect accepted earlier-phase code only when:
+
+- Phase 2 directly depends on that interface;
+- a relevant regression test fails; or
+- repository evidence contradicts a documented contract.
+
+The accepted baseline exists so previous work can be trusted and verified,
+not continuously re-derived.
+
+---
 
 ## Essential architecture
 
-- `src/domain/` — provider-neutral, pure, dependency-free. `FormSchema`,
-  `Question` union, sections + routing graph, `StructuralFingerprint`,
-  semantic/profile/answer models.
-- `src/config/` — Zod schema (`.strict()`), env merge, JSON/YAML/TS discovery.
-- `src/cli/` — frozen exit-code contract + command handlers.
+- `src/domain/` — provider-neutral, pure, dependency-free domain models,
+  structural fingerprinting, sections/routing types, semantic/profile/answer
+  types reserved for later phases.
+- `src/config/` — Zod-based configuration and config discovery.
+- `src/cli/` — CLI handlers and frozen exit-code contract.
 - `src/db/` — `better-sqlite3`, WAL, FK ON, idempotent migrations.
-- `src/llm/` — `ChatCompletionClient` + deterministic `FakeProvider`.
-- `src/logging/` — redaction matrix + structured logger.
-- `src/fixtures/` — inline fixtures, archive loader, real-payload
-  decoder/sanitizer.
-- `bin/form-agent.js` — CLI launcher: `dist/src/index.js`, else TS source.
+- `src/parser/google-forms.ts` — accepted Phase 1 offline Google Forms
+  structural parser.
+- `src/analyze/` — accepted Phase 1 input resolution, structural analysis,
+  cache/persistence integration, and human-readable summary.
+- `src/llm/` — provider interface + deterministic fake provider; no real LLM
+  is used by Phase 1 or Phase 2.
+- `src/logging/` — redaction + structured logger.
+- `src/fixtures/` — sanitized fixture/archive loading and embedded-payload
+  decoding.
+- `bin/form-agent.js` — CLI launcher.
 
-Module boundary: `src/domain/` must stay free of I/O, LLM and DB imports. The
-Phase 1 parser consumes/produces these types; it must not pull provider or
-network concerns into the domain layer.
+Permanent module boundary:
 
-## Contracts / interfaces Phase 1 depends on
+`src/domain/` must remain free of I/O, DB, network, browser, and LLM imports.
 
-These already exist and are tested — Phase 1 should **use** them, not redefine
-them.
+Phase 2 policy code should remain separate from Phase 1 structural parsing
+unless a direct contract requires otherwise.
 
-| Interface | Location | Notes |
-| --- | --- | --- |
-| `FormSchema` + `Question` union | `src/domain/types.ts` | 13 kinds; `FORMS_SCHEMA_VERSION = 2`; bump only if the shape changes |
-| `DEFAULT_SECTION_ID` | `src/domain/types.ts` | `'__default__'` — implicit single section |
-| `FormSection` / `SectionRouting` / `RoutingRule` | `src/domain/types.ts` | `default: 'continue' \| 'submit' \| sectionId`; `conditional` + `rules` |
-| `NavigationTarget` | `src/domain/types.ts` | `'submit'` / `'continue'` sentinels — never raw indices |
-| `sectionOfQuestion`, `resolveNavigationTarget`, `reachableSectionIds` | `src/domain/types.ts` | routing helpers already implemented |
-| Guard helpers (`isGridQuestion`, `isScaleQuestion`, …) | `src/domain/types.ts` | use these instead of string comparisons |
-| `structuralFingerprint`, `jsonFingerprint`, `canonicalJson`, `sha256Hex` | `src/domain/fingerprint.ts` | `FINGERPRINT_VERSION = 1`; input `{providerId, formId, formJson, generatorVersion}` |
-| `MIGRATIONS` + `FormAgentDatabase.open()` | `src/db/` | add tables via **new** migration entries only |
-| `ExitCodes` + `describeExitCode` | `src/cli/exit-codes.ts` | frozen positive-only mapping |
-| `handleCmdAnalyze` | `src/cli/index.ts` | currently throws `NotImplementedError` → exit 2 |
-| `loadFixture(id)` / `tryLoadArchive(id)` | `src/fixtures/index.ts` | archive first, then inline |
-| `extractPayload` / `decodeEmbeddedPayload` | `src/fixtures/observed-payload.ts` | Phase 0 research decoder — reuse, do not fork |
-| `sanitizeResponderHtml` | `src/fixtures/observed-sanitize.ts` | archive sanitizer (numeric ids preserved) |
+---
 
-### Exit-code contract (frozen)
+## Accepted Phase 1 behavior
 
-`0` success · `1` error · `2` usage/config · `3` validation · `4` LLM offline ·
-`5` LLM connectivity · `127` unknown command. Codes `6-126` reserved. Negative
-codes are forbidden.
+Phase 1 is accepted at `309f097`.
 
-## Current database / LLM / fixture state
+### Structural parser
 
-- **Database**: migrations **1-4** exist — `meta`, `forms`, `form_schema`,
-  `analysis_cache`, `llm_calls`. `form_schema` is keyed by `fingerprint_id` and
-  stores `schema_version` + `generator_version`; `analysis_cache` is keyed by
-  `fingerprint_id`. `llm_calls` exists for the Phase 3 dependency; **no rows
-  land yet**. The real DB file is gitignored under `.data/`.
-- **LLM**: only the `fake` provider is wired. `provider <id> --validate` and
-  `provider where` work; the `openai-compatible` client arrives in Phase 3.
-  Phase 1 must not require an LLM.
-- **Fixtures**: `fixtures/archives/observed-responder.html` (sanitized real
-  responder page; read-only capture — the live form was never modified and no
-  response was submitted) and `observed-responder.structure.json` (decoded
-  structure). Inline `official`/`demo` fixtures are invented markup and must
-  never be the sole basis for parser selectors.
+`src/parser/google-forms.ts`:
 
-### Verified real-form facts (golden expectations for Phase 1)
+- parses sanitized responder-page HTML offline;
+- extracts `FB_PUBLIC_LOAD_DATA_` through the accepted Phase 0 decoder;
+- produces provider-neutral `FormSchema`;
+- preserves question order and section assignment;
+- derives required state from the embedded payload flag;
+- supports fixture-validated type codes:
+  - `0` text
+  - `1` paragraph-text
+  - `2` single-choice
+  - `4` multi-choice
+  - `5` linear-scale
+  - `7` multiple-choice-grid
+  - `9` date
+  - `10` time
+- maps distinct deferred/unknown types conservatively to `unsupported`;
+- throws controlled `GoogleFormsParseError` for malformed non-array items;
+- derives linear-scale bounds from numeric step labels when available;
+- performs no network, browser, submission, or LLM activity.
 
-- Title: *Evaluación de experiencia y preferencias del estudiante*; **not** a
-  quiz.
-- **27 questions, 5 sections, 4 required**, 32 payload items
-  (27 questions + 5 page breaks).
-- Section titles in order: `Datos generales`, `Experiencia académica presencial
-  sin título`, `Experiencia académica virtual`, `Organización y satisfacción`,
-  `Comentarios finales`.
-- Raw type-code counts: `0` short answer = **8**, `1` paragraph = **3**,
-  `2` multiple choice = **1**, `4` checkboxes = **3**, `5` linear scale = **5**,
-  `6` page break = **5**, `7` grid = **4**, `9` date = **1**, `10` time = **2**.
-- All 4 grids are single-select (`role="radio"`) → `multiple-choice-grid`, with
-  row counts 4/4/5/5.
-- Required flags come from `g[0][2] === 1`. Only the final 4 questions are
-  required (3 paragraph + 1 single choice).
-- Routing: sequential only; no conditional rules; single terminal submit path.
+### Deferred structural behavior
 
-## Commands to validate the repository
+The following remain deliberately unvalidated/deferred:
+
+- dropdown;
+- rating;
+- file upload;
+- checkbox-grid detection;
+- "Other" free-text choice handling;
+- conditional routing.
+
+Important:
+
+Google Forms checkbox grids share payload type code `7` with the validated
+single-select grid shape. Phase 1 cannot distinguish them from the embedded
+payload alone because the distinguishing role is in DOM markup that the parser
+does not consume.
+
+Therefore accepted Phase 1 behavior emits type `7` as
+`multiple-choice-grid` / `selectionMode: 'single'`, the only real-fixture shape
+validated so far.
+
+Conditional routing is not parsed. Accepted routing is sequential
+`continue` / terminal `submit`, with `hasRouting === false`.
+
+Do not invent undocumented payload indices to add deferred support.
+
+### Accepted real fixture facts
+
+Sanitized authoritative fixture:
+
+`fixtures/archives/observed-responder.html`
+
+Accepted facts:
+
+- 5 sections;
+- 27 questions;
+- 4 required questions;
+- 32 payload items total: 27 questions + 5 page breaks;
+- 4 validated single-select grids with row counts 4/4/5/5;
+- sequential routing;
+- one terminal submit section.
+
+Normalized counts:
+
+- text: 8
+- paragraph-text: 3
+- single-choice: 1
+- multi-choice: 3
+- linear-scale: 5
+- multiple-choice-grid: 4
+- date: 1
+- time: 2
+
+The committed golden artifact is:
+
+`tests/golden/observed-responder.schema.json`
+
+---
+
+## Phase 1 analyze / cache contracts
+
+Accepted analysis modules:
+
+- `src/analyze/analyze.ts`
+- `src/analyze/resolve-input.ts`
+- `src/analyze/store.ts`
+
+`form-agent analyze` now works for local Phase 1 inputs.
+
+Accepted input forms include:
+
+- sanitized local file path;
+- fixture id;
+- fixture URL handled by the local fixture harness.
+
+Live HTTP Google Forms fetching is NOT implemented.
+
+A live Google Forms URL is rejected rather than fetched.
+
+Analysis is:
+
+- offline;
+- read-only with respect to the fixture;
+- submission-free;
+- LLM-free.
+
+Structural schemas are persisted using the existing Phase 0 database design,
+keyed by structural fingerprint.
+
+The fingerprint excludes ephemeral input metadata such as current
+`meta.url` / `meta.capturedAt`.
+
+On a cache hit, accepted behavior reuses the cached structural schema while
+preserving current-invocation metadata.
+
+Phase 1 parser generator version:
+
+`GOOGLE_FORMS_PARSER_VERSION = 0.1.0`
+
+---
+
+## Database state
+
+Accepted migrations are currently **1-4**.
+
+Existing database structures include:
+
+- `meta`
+- `forms`
+- `form_schema`
+- `analysis_cache`
+- `llm_calls`
+
+Phase 1 actively uses:
+
+- `forms`
+- `form_schema`
+- `analysis_cache`
+
+`form_schema` is keyed by `fingerprint_id`.
+
+Do not mutate existing migration definitions.
+
+If Phase 2 genuinely requires new durable authorization or rate-policy state
+that existing tables cannot represent, append only the minimal new migration
+and test migration/reopen behavior.
+
+The real database file remains gitignored under `.data/`.
+
+---
+
+## Exit-code contract
+
+Frozen CLI mapping:
+
+- `0` success
+- `1` error
+- `2` usage/config
+- `3` validation
+- `4` LLM offline
+- `5` LLM connectivity
+- `127` unknown command
+
+Codes `6-126` remain reserved.
+
+Do not renumber or repurpose accepted codes without an explicit phase
+specification change.
+
+---
+
+## Current CLI state relevant to Phase 2
+
+Implemented:
+
+- version/help foundation;
+- provider inspection/validation foundation;
+- `analyze` for accepted local/fixture inputs.
+
+Still intentionally unimplemented:
+
+- `preview`
+- `run`
+- future answer/execution flows
+
+Phase 2 adds policy/authorization CLI behavior described only by
+`docs/PHASE_2.md`.
+
+Authorization must not itself perform execution.
+
+---
+
+## Current LLM state
+
+Only deterministic/foundation LLM infrastructure from Phase 0 exists.
+
+Phase 2 must remain LLM-free.
+
+Do not add:
+
+- semantic whole-form inference;
+- respondent/profile generation;
+- answer generation;
+- real provider inference;
+- cloud model calls.
+
+Those belong to later phases.
+
+---
+
+## Phase 2 objective
+
+Current phase:
+
+**Phase 2 — Policy and Authorization**
+
+Specification:
+
+`docs/PHASE_2.md`
+
+Phase 2 creates the safety gates that future execution features must consume.
+
+Primary scope:
+
+- explicit durable authorization / allowlisting;
+- revocation and authorization inspection;
+- deterministic sensitive-field classification;
+- configurable sensitive-field rules;
+- central `PolicyEngine`;
+- stable machine-readable policy reason codes;
+- safety-mode gating;
+- deterministic/durable rate-policy state;
+- optional policy visibility in `analyze`;
+- regression guards preventing future-phase scope creep.
+
+Core principle:
+
+**deny future execution by default.**
+
+Successful parsing, local fixture presence, previous analysis, cached schemas,
+or form identity must never implicitly grant execution authorization.
+
+---
+
+## Phase 2 must NOT implement
+
+Do not implement:
+
+- respondent/profile generation;
+- semantic answer generation;
+- answer consistency logic;
+- preview approval workflow;
+- Playwright/browser execution;
+- live network form fetching;
+- Google Form submission;
+- scheduling/submission workers;
+- randomized human-like pacing;
+- anti-detection/evasion logic;
+- deferred conditional routing;
+- deferred checkbox-grid support;
+- file uploads;
+- real LLM calls;
+- OpenClaw;
+- Telegram.
+
+`preview` and `run` remain unavailable after Phase 2.
+
+Do not begin Phase 3 automatically.
+
+---
+
+## Phase 2 design boundaries
+
+### Authorization
+
+Authorization means only that a canonical target is explicitly allowlisted for
+a supported future execution scope.
+
+It does not imply:
+
+- sensitive-field permission;
+- human approval;
+- answer approval;
+- rate-policy eligibility;
+- execution.
+
+### Sensitive classification
+
+Prefer a policy-layer assessment over mutating the accepted structural parser.
+
+Classification is deterministic and LLM-free.
+
+When several sensitivity rules match, the effective policy uses the most
+restrictive mode defined by `docs/PHASE_2.md`.
+
+File upload is always sensitive and `never` for the MVP.
+
+### Rate policy
+
+Rate controls are safety limits, not anti-detection behavior.
+
+Phase 2 may:
+
+- evaluate allow/deny;
+- persist counters/state;
+- expose stable reason codes;
+- return deterministic retry-after information.
+
+Phase 2 must NOT:
+
+- sleep;
+- randomly delay;
+- imitate humans;
+- submit;
+- schedule batches;
+- create an executor.
+
+Tests should inject time rather than waiting on wall-clock sleeps.
+
+---
+
+## Commands to validate the accepted repository
 
 ```bash
-npm install
-npm test              # full regression suite
+npm run verify:phase1
+npm test
 npm run typecheck
 npm run build
 
-# targeted
-npx vitest run tests/schema.test.ts
+node bin/form-agent.js analyze fixtures/archives/observed-responder.html
 
-# CLI smoke (analyze currently exits 2: not-implemented)
-node bin/form-agent.js --version
-node bin/form-agent.js provider where
-node bin/form-agent.js analyze https://docs.google.com/forms/d/e/1FAIpQLSd98rnMrAiFm3vA4FoyGnS0UbOqz-M6qR9ZRqcwSOOx4nWX7w/viewform
 ```
+Accepted Phase 1 verification:
 
-## Known limitations relevant to Phase 1
+- Phase 1 targeted: 67 passing
+- full regression: 162 passing
+- typecheck: clean
+- build: clean
+- analyze smoke: exit 0
 
-1. The embedded `FB_PUBLIC_LOAD_DATA_` layout is **undocumented and
-   version-specific**. Anchor on it (plus `data-params` / `entry.*` names and
-   ARIA) rather than obfuscated CSS classes; stamp `generatorVersion` so caches
-   invalidate.
-2. The form has **no** dropdown, rating, file upload, checkbox grid, "Other", or
-   conditional routing. Those are structurally represented in the domain model
-   but **unvalidated against real markup** — Phase 1 must not invent payload
-   indices for them, and must **not** remove their domain representations.
-3. `data-item-id` appears only on page-break containers (5), not on questions;
-   per-question identity must come from `data-params` / `entry.*` names.
-4. `aria-required` appears on only 1 of 4 required questions — required state
-   must come from the embedded `g[0][2] === 1` flag.
-5. `docs/phase0.md` prose states short answer ×10 / linear scale ×6; the
-   **verified raw counts are ×8 / ×5**. Repository evidence wins. Phase 1 should
-   encode the verified counts as its golden expectation.
-6. `analyze` currently returns exit `2` (`not-implemented`). Phase 1 changes the
-   behavior but must keep the exit-code contract.
+Phase 2 final verification additionally follows `docs/PHASE_2.md`.
 
-## Where Phase 1 should start
+---
 
-1. Read `AGENTS.md` and `docs/PHASE_1.md`.
-2. Turn the `P1-R*` requirements into a visible TODO list.
-3. Begin at **P1-R1**: parse `fixtures/archives/observed-responder.html`, extract
-   `FB_PUBLIC_LOAD_DATA_`, and produce a provider-neutral `FormSchema` matching
-   the verified facts above (5 sections, 27 questions, ordering, required flags,
-   4 single-select grids, sequential routing, terminal submit path).
-4. Wire the structural fingerprint + cache integration already designed in
-   `src/domain/fingerprint.ts` and the Phase 0 migrations.
-5. Make `form-agent analyze` emit useful structural output.
-6. Keep the whole phase LLM-free and submission-free.
+## Where Phase 2 should start
 
-Do not begin Phase 2. Stop when every Phase 1 acceptance criterion has evidence
-and final verification passes.
+1. Read `AGENTS.md`.
+2. Read this handoff.
+3. Read `docs/PHASE_2.md`.
+4. Treat `309f097` as the accepted implementation baseline.
+5. Do not broadly re-audit Phase 0/1.
+6. Inspect only existing interfaces directly needed by Phase 2.
+7. Convert P2-R1 through P2-R20 into 6-8 visible milestones.
+8. Keep exactly one milestone in progress.
+9. Implement policy/authorization infrastructure only.
+10. Use targeted tests during implementation.
+11. Run complete verification only for final acceptance.
+12. Produce the P2-R1..P2-R20 acceptance report.
+13. Do not commit.
+14. Stop.
+15. Do not begin Phase 3.
