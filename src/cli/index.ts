@@ -11,6 +11,11 @@ import { resolveProviderConfig } from '../config/load.ts';
 import type { ChatCompletionClient } from '../llm/interface.ts';
 import { FakeProvider } from '../llm/fake.ts';
 import type { Logger } from '../logging/logger.ts';
+import { FormAgentDatabase } from '../db/database.ts';
+import { AnalysisStore } from '../analyze/store.ts';
+import { analyzeForm, formatAnalysisSummary } from '../analyze/analyze.ts';
+import { AnalyzeInputError, resolveAnalyzeInput, type ResolvedAnalyzeInput } from '../analyze/resolve-input.ts';
+import { GoogleFormsParseError } from '../parser/google-forms.ts';
 import { ExitCodes } from './exit-codes.ts';
 
 export class NotImplementedError extends Error {
@@ -55,11 +60,38 @@ export function createClientForProvider(
 }
 
 export async function handleCmdAnalyze(
-  _url: string,
+  urlOrFixture: string,
   ctx: CliContext,
 ): Promise<number> {
-  void ctx;
-  notImplemented('analyze');
+  let input: ResolvedAnalyzeInput;
+  try {
+    input = await resolveAnalyzeInput(urlOrFixture);
+  } catch (err) {
+    if (err instanceof AnalyzeInputError) {
+      ctx.logger.error(err.message);
+      return ExitCodes.USAGE;
+    }
+    throw err;
+  }
+
+  const database = FormAgentDatabase.open({
+    directory: ctx.config.database.directory,
+    filename: ctx.config.database.filename,
+  });
+  try {
+    const store = new AnalysisStore(database);
+    const outcome = analyzeForm({ html: input.html, url: input.url }, store);
+    process.stdout.write(`${formatAnalysisSummary(outcome.schema, outcome.fingerprintId)}\n`);
+    return ExitCodes.SUCCESS;
+  } catch (err) {
+    if (err instanceof GoogleFormsParseError) {
+      ctx.logger.error(`Failed to parse form: ${err.message}`);
+      return ExitCodes.VALIDATION;
+    }
+    throw err;
+  } finally {
+    database.close();
+  }
 }
 
 export async function handleCmdFile(

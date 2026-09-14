@@ -1,0 +1,75 @@
+{
+  "title": "Evaluación de experiencia y preferencias del estudiante",
+  "description": "Este formulario tiene como finalidad evaluar la experiencia de los estudiantes en relación con sus actividades académicas, organización del tiempo y satisfacción. Algunas preguntas serán utilizadas para probar diferentes tipos de respuesta y la navegación entre secciones.",
+  "sections": [
+    {
+      "id": "1249846430",
+      "title": "Datos generales",
+      "questionIds": ["1768533602", "1307724388", "185285285", "81510332", "1240080904"]
+    },
+    {
+      "id": "336245140",
+      "title": "Experiencia académica presencial sin título",
+      "questionIds": ["1363168754", "215989038", "1680754316", "2017386037", "516057794", "1969726133"]
+    },
+    {
+      "id": "1142924921",
+      "title": "Experiencia académica virtual",
+      "questionIds": ["176568645", "780007956", "1161579616", "959539122", "1890094526", "16934429", "759854928"]
+    },
+    {
+      "id": "21510676",
+      "title": "Organización y satisfacción",
+      "questionIds": ["1344142663", "151469523", "370988481", "1536986917", "1478815747"]
+    },
+    {
+      "id": "1860209072",
+      "title": "Comentarios finales",
+      "questionIds": ["1408676108", "783078409", "1992042423", "1834773003"]
+    }
+  ],
+  "questionOrder": [
+    "1768533602",
+    "1307724388",
+    "185285285",
+    "81510332",
+    "1240080904",
+    "1363168754",
+    "215989038",
+    "1680754316",
+    "2017386037",
+    "516057794",
+    "1969726133",
+    "176568645",
+    "780007956",
+    "1161579616",
+    "959539122",
+    "1890094526",
+    "16934429",
+    "759854928",
+    "1344142663",
+    "151469523",
+    "370988481",
+    "1536986917",
+    "1478815747",
+    "1408676108",
+    "783078409",
+    "1992042423",
+    "1834773003"
+  ],
+  "kindCounts": {
+    "date": 1,
+    "linear-scale": 5,
+    "multi-choice": 3,
+    "multiple-choice-grid": 4,
+    "paragraph-text": 3,
+    "single-choice": 1,
+    "text": 8,
+    "time": 2
+  },
+  "requiredQuestionIds": ["1408676108", "783078409", "1992042423", "1834773003"],
+  "gridRowCounts": [4, 4, 5, 5],
+  "terminalSectionIds": ["1860209072"],
+  "hasRouting": false,
+  "answerModel": "multi-section"
+}
