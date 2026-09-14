@@ -179,8 +179,8 @@ structural JSON); we decoded **32 items = 27 questions + 5 page breaks**. A
 `tests/fixtures.test.ts` so these findings cannot silently drift.
 
 - **Question types actually present** (Google type code in parentheses) —
-  short answer (`0`, ten of them), paragraph (`1`, three), multiple choice
-  (`2`, one), checkboxes (`4`, three), linear scale (`5`, six), grid (`7`,
+  short answer (`0`, eight of them), paragraph (`1`, three), multiple choice
+  (`2`, one), checkboxes (`4`, three), linear scale (`5`, five), grid (`7`,
   **four**), date (`9`, one), time (`10`, two), and page breaks/sections (`6`,
   five). **No dropdown (`3`), no rating (`18`), no file upload (`13`), and no
   Other option** appear in this particular form; the model represents them
@@ -345,8 +345,8 @@ JSON, which we decoded: **32 items = 27 questions + 5 page breaks**. A sanitized
 copy plus the decoded structure JSON are archived as fixtures, and the values
 below are asserted in `tests/fixtures.test.ts`.
 
-- **Question types present**: short answer (type 0, ×10), paragraph (1, ×3),
-  multiple choice (2, ×1), checkboxes (4, ×3), linear scale (5, ×6), grid
+- **Question types present**: short answer (type 0, ×8), paragraph (1, ×3),
+  multiple choice (2, ×1), checkboxes (4, ×3), linear scale (5, ×5), grid
   (7, ×4) — all served as `multiple-choice-grid` because every grid row is
   single-select — date (9, ×1), time (10, ×2), and page breaks/sections
   (6, ×5). **No dropdown (3), no rating (18), no file upload (13) and no Other
