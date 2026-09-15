@@ -25,6 +25,9 @@ import {
   executionExitCode,
 } from '../execution/errors.ts';
 import { DraftError } from '../draft/errors.ts';
+import { resolveDraftProvider, isDraftProviderKind, type DraftProviderKind, type ResolvedDraftProvider } from '../draft/resolve.ts';
+import { LlmProviderError, llmExitCode } from '../llm/errors.ts';
+import { LlmCallStore } from '../llm/audit.ts';
 import { ConsistencyError } from '../consistency/errors.ts';
 import { formatPreflightHuman, formatSubmitHuman, preflightToJson, submitToJson } from '../execution/format.ts';
 
@@ -38,6 +41,7 @@ interface RunArgs {
   submit: boolean;
   expectPlan: string | undefined;
   by: string | undefined;
+  draftProvider: DraftProviderKind | undefined;
 }
 
 type ParsedRunArgs = { ok: true; value: RunArgs } | { ok: false; error: string };
@@ -49,6 +53,7 @@ function parseRunArgs(args: string[]): ParsedRunArgs {
   let submit = false;
   let expectPlan: string | undefined;
   let by: string | undefined;
+  let draftProvider: DraftProviderKind | undefined;
   let sawTarget = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -57,23 +62,36 @@ function parseRunArgs(args: string[]): ParsedRunArgs {
       json = true;
     } else if (arg === '--submit') {
       submit = true;
-    } else if (arg === '--seed' || arg === '--expect-plan' || arg === '--by') {
+    } else if (arg === '--seed' || arg === '--expect-plan' || arg === '--by' || arg === '--draft-provider') {
       const next = args[i + 1];
       if (next === undefined || next.startsWith('--')) {
         return { ok: false, error: `${arg} requires a value` };
       }
       if (arg === '--seed') seed = next;
       else if (arg === '--expect-plan') expectPlan = next;
-      else by = next;
+      else if (arg === '--by') by = next;
+      else {
+        if (!isDraftProviderKind(next)) return { ok: false, error: 'unknown draft provider' };
+        draftProvider = next;
+      }
       i += 1;
-    } else if (arg.startsWith('--seed=') || arg.startsWith('--expect-plan=') || arg.startsWith('--by=')) {
+    } else if (
+      arg.startsWith('--seed=') ||
+      arg.startsWith('--expect-plan=') ||
+      arg.startsWith('--by=') ||
+      arg.startsWith('--draft-provider=')
+    ) {
       const eq = arg.indexOf('=');
       const name = arg.slice(0, eq);
       const value = arg.slice(eq + 1);
       if (value === '') return { ok: false, error: `${name} requires a non-empty value` };
       if (name === '--seed') seed = value;
       else if (name === '--expect-plan') expectPlan = value;
-      else by = value;
+      else if (name === '--by') by = value;
+      else {
+        if (!isDraftProviderKind(value)) return { ok: false, error: 'unknown draft provider' };
+        draftProvider = value;
+      }
     } else if (arg.startsWith('--')) {
       // Unknown flag; never echo raw contents.
       return { ok: false, error: 'unknown flag' };
@@ -84,7 +102,7 @@ function parseRunArgs(args: string[]): ParsedRunArgs {
     }
   }
 
-  return { ok: true, value: { target, seed, json, submit, expectPlan, by } };
+  return { ok: true, value: { target, seed, json, submit, expectPlan, by, draftProvider } };
 }
 
 function validateArgs(args: RunArgs): string | null {
@@ -169,6 +187,26 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
       throw err;
     }
 
+    // Resolve the selected DraftProvider only for preflight. `--submit` loads
+    // the persisted approved snapshot and makes ZERO LLM calls (P6-R16), so it
+    // never resolves or contacts a real provider.
+    let resolvedDraft: ResolvedDraftProvider | null = null;
+    if (!value.submit) {
+      try {
+        const llmCallStore = new LlmCallStore(database);
+        resolvedDraft = resolveDraftProvider(value.draftProvider, {
+          config: ctx.config,
+          recordCall: (entry) => llmCallStore.record(entry),
+        });
+      } catch (err) {
+        if (err instanceof LlmProviderError) {
+          ctx.logger.error(err.message);
+          return llmExitCode(err.code);
+        }
+        throw err;
+      }
+    }
+
     const orchestrator = new ExecutionOrchestrator({
       config: ctx.config,
       database,
@@ -177,6 +215,9 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
       target: canonical,
       rawTarget: value.target as string,
       seed: value.seed as string,
+      ...(resolvedDraft !== null
+        ? { draftProvider: resolvedDraft.provider, draftProviderProvenance: resolvedDraft.provenance }
+        : {}),
     });
 
     // P5-R3: authorization-only gate BEFORE any browser/network activity.
@@ -207,6 +248,7 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
             accepting: result.accepting,
             receipt: result.receipt,
             formTitle: result.formTitle,
+            provenance: result.provenance,
           }),
           null,
           2,
@@ -221,11 +263,16 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
           accepting: result.accepting,
           receipt: result.receipt,
           formTitle: result.formTitle,
+          provenance: result.provenance,
         })}\n`,
       );
     }
     return ExitCodes.SUCCESS;
   } catch (err) {
+    if (err instanceof LlmProviderError) {
+      ctx.logger.error(err.message);
+      return llmExitCode(err.code);
+    }
     if (err instanceof ExecutionError) {
       if (err.retryAfterMs !== null) {
         ctx.logger.error(`${err.message} (retry-after ${err.retryAfterMs}ms)`);

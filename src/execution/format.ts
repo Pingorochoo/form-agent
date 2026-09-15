@@ -11,6 +11,7 @@
 import type { DraftBundle, DraftValue } from '../domain/draft.ts';
 import type { ConsistencyReport } from '../domain/consistency.ts';
 import type { AcceptingState, ExecutionOutcome, ExecutionPlan } from '../domain/execution.ts';
+import type { DraftProviderProvenance } from '../draft/provenance.ts';
 import type { ExecutionReceipt } from './receipt.ts';
 
 function formatValue(value: DraftValue): string {
@@ -54,10 +55,11 @@ export interface PreflightFormatInput {
   accepting: AcceptingState;
   receipt: ExecutionReceipt;
   formTitle: string;
+  provenance: DraftProviderProvenance;
 }
 
 export function formatPreflightHuman(input: PreflightFormatInput): string {
-  const { plan, bundle, report, accepting, receipt, formTitle } = input;
+  const { plan, bundle, report, accepting, receipt, formTitle, provenance } = input;
   const lines: string[] = [];
   lines.push(`Preflight plan: ${formTitle}`);
   lines.push(`Run ID: ${receipt.id}`);
@@ -67,6 +69,13 @@ export function formatPreflightHuman(input: PreflightFormatInput): string {
   lines.push(`Draft ID: ${plan.draftId}`);
   lines.push(`Consistency report: ${plan.consistencyReportId} (${STATUS_LABEL[report.status]}, ${report.hardIssues} hard, ${report.softIssues} soft)`);
   lines.push(`Plan ID: ${plan.planId}`);
+  lines.push(`Draft provider: ${provenance.providerId} v${provenance.providerVersion}`);
+  if (provenance.modelLabel !== null) {
+    lines.push(`Model: ${provenance.modelLabel}`);
+  }
+  if (provenance.promptContractVersions !== '') {
+    lines.push(`Prompt contract: ${provenance.promptContractVersions}`);
+  }
   lines.push(`Provider: ${plan.providerId} v${plan.providerVersion}`);
   lines.push(`Fillable (answered): ${plan.fillableCount}`);
   lines.push(`Blocked/deferred: ${plan.blockedCount}`);
@@ -80,7 +89,7 @@ export function formatPreflightHuman(input: PreflightFormatInput): string {
 }
 
 export function preflightToJson(input: PreflightFormatInput): Record<string, unknown> {
-  const { plan, bundle, report, accepting, receipt } = input;
+  const { plan, bundle, report, accepting, receipt, provenance } = input;
   return {
     command: 'run',
     mode: 'preflight',
@@ -101,6 +110,12 @@ export function preflightToJson(input: PreflightFormatInput): Record<string, unk
       fillableCount: plan.fillableCount,
       blockedCount: plan.blockedCount,
       policy: { allowed: plan.policyAllowed, reasons: plan.policyReasons },
+    },
+    draftProvider: {
+      id: provenance.providerId,
+      version: provenance.providerVersion,
+      model: provenance.modelLabel,
+      promptContractVersions: provenance.promptContractVersions === '' ? null : provenance.promptContractVersions,
     },
     accepting,
     consistencyReport: report,

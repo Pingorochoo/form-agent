@@ -14,9 +14,10 @@
 import { AnalyzeInputError, resolveAnalyzeInput } from '../analyze/resolve-input.ts';
 import { GoogleFormsParseError, parseGoogleFormsHtml } from '../parser/google-forms.ts';
 import { PolicyConfigError, loadSensitiveRules, resolveSensitiveRules } from '../policy/policy-config.ts';
-import { DeterministicReferenceProvider } from '../draft/reference.ts';
 import { generateDraft } from '../draft/orchestrate.ts';
+import { resolveDraftProvider, isDraftProviderKind, type DraftProviderKind } from '../draft/resolve.ts';
 import { DraftError } from '../draft/errors.ts';
+import { LlmProviderError, llmExitCode } from '../llm/errors.ts';
 import { runConsistencyGate } from '../consistency/gate.ts';
 import { ConsistencyError } from '../consistency/errors.ts';
 import { checkToJson, formatCheckHuman } from '../consistency/format.ts';
@@ -27,6 +28,7 @@ interface CheckArgs {
   input: string | undefined;
   seed: string | undefined;
   json: boolean;
+  draftProvider: DraftProviderKind | undefined;
 }
 
 type ParsedCheckArgs = { ok: true; value: CheckArgs } | { ok: false; error: string };
@@ -41,25 +43,36 @@ function parseCheckArgs(args: string[]): ParsedCheckArgs {
   let input: string | undefined;
   let seed: string | undefined;
   let json = false;
+  let draftProvider: DraftProviderKind | undefined;
   let sawInput = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
     if (arg === '--json') {
       json = true;
-    } else if (arg === '--seed') {
+    } else if (arg === '--seed' || arg === '--draft-provider') {
       const next = args[i + 1];
       if (next === undefined || next.startsWith('--')) {
-        return { ok: false, error: '--seed requires a value' };
+        return { ok: false, error: `${arg} requires a value` };
       }
-      seed = next;
+      if (arg === '--seed') {
+        seed = next;
+      } else {
+        if (!isDraftProviderKind(next)) return { ok: false, error: 'unknown draft provider' };
+        draftProvider = next;
+      }
       i += 1;
-    } else if (arg.startsWith('--seed=')) {
-      const value = arg.slice('--seed='.length);
-      if (value === '') {
-        return { ok: false, error: '--seed requires a non-empty value' };
+    } else if (arg.startsWith('--seed=') || arg.startsWith('--draft-provider=')) {
+      const eq = arg.indexOf('=');
+      const name = arg.slice(0, eq);
+      const value = arg.slice(eq + 1);
+      if (value === '') return { ok: false, error: `${name} requires a non-empty value` };
+      if (name === '--seed') {
+        seed = value;
+      } else {
+        if (!isDraftProviderKind(value)) return { ok: false, error: 'unknown draft provider' };
+        draftProvider = value;
       }
-      seed = value;
     } else if (arg.startsWith('--')) {
       return { ok: false, error: 'unknown flag' };
     } else {
@@ -71,7 +84,7 @@ function parseCheckArgs(args: string[]): ParsedCheckArgs {
     }
   }
 
-  return { ok: true, value: { input, seed, json } };
+  return { ok: true, value: { input, seed, json, draftProvider } };
 }
 
 export async function handleCmdCheck(args: string[], ctx: CliContext): Promise<number> {
@@ -80,7 +93,7 @@ export async function handleCmdCheck(args: string[], ctx: CliContext): Promise<n
     ctx.logger.error(parsed.error);
     return ExitCodes.USAGE;
   }
-  const { input, seed, json } = parsed.value;
+  const { input, seed, json, draftProvider } = parsed.value;
 
   if (seed === undefined || seed.trim() === '') {
     ctx.logger.error('check requires --seed <seed>');
@@ -124,15 +137,30 @@ export async function handleCmdCheck(args: string[], ctx: CliContext): Promise<n
     throw err;
   }
 
+  let selectedProvider;
+  try {
+    selectedProvider = resolveDraftProvider(draftProvider, { config: ctx.config });
+  } catch (err) {
+    if (err instanceof LlmProviderError) {
+      ctx.logger.error(err.message);
+      return llmExitCode(err.code);
+    }
+    throw err;
+  }
+
   let bundle;
   try {
     bundle = await generateDraft({
       schema,
       seed,
-      provider: new DeterministicReferenceProvider(),
+      provider: selectedProvider.provider,
       sensitiveRules,
     });
   } catch (err) {
+    if (err instanceof LlmProviderError) {
+      ctx.logger.error(err.message);
+      return llmExitCode(err.code);
+    }
     if (err instanceof DraftError) {
       ctx.logger.error(err.message);
       return ExitCodes.VALIDATION;

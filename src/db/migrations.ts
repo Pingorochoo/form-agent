@@ -181,6 +181,47 @@ export const MIGRATIONS: Migration[] = [
         ON execution_receipts(submission_key) WHERE submit_attempted = 1;
     `,
   },
+  {
+    id: 8,
+    name: 'execution_plan_snapshots',
+    up: `
+      -- Durable approved execution-plan snapshot (Phase 6).
+      --
+      -- Persists the EXACT validated synthetic DraftBundle used by preflight so
+      -- submit reuses the operator-approved values without re-calling a real
+      -- (nondeterministic) LLM. plan_id is the PRIMARY KEY and is
+      -- content/provenance-derived, so a conflicting second write for the same
+      -- plan id is a corruption/programming error (enforced by the store).
+      --
+      -- bundle_sha256 is a SHA-256 digest over the exact canonical serialized
+      -- bundle (bundle_json): any byte/semantic change to a persisted answer or
+      -- profile fails closed before fill. provenance_hash is a content-bound
+      -- hash over the safe provider provenance columns below, so tampering with
+      -- provider provenance cannot silently preserve an approved snapshot.
+      --
+      -- Never stores: API keys, Authorization headers, cookies/browser storage,
+      -- raw HTML, raw LLM prompt/response, raw provider exceptions, or URL
+      -- userinfo/query secrets. This is NOT the execution receipt table.
+      CREATE TABLE IF NOT EXISTS execution_plan_snapshots (
+        plan_id TEXT PRIMARY KEY,
+        target_key TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        draft_id TEXT NOT NULL,
+        consistency_report_id TEXT NOT NULL,
+        draft_provider_id TEXT NOT NULL,
+        draft_provider_version TEXT NOT NULL,
+        model_or_provider_label TEXT,
+        prompt_contract_versions TEXT NOT NULL DEFAULT '',
+        endpoint_hash TEXT,
+        provenance_hash TEXT NOT NULL,
+        bundle_json TEXT NOT NULL,
+        bundle_sha256 TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_execution_plan_snapshots_target
+        ON execution_plan_snapshots(target_key);
+    `,
+  },
 ];
 
 export function migrationMap(): Map<number, Migration> {

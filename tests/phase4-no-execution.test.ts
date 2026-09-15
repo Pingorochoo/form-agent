@@ -84,8 +84,11 @@ describe('P4-R18/R19 — no execution or out-of-scope behavior', () => {
 });
 
 describe('P4-R17 — no persistence or migration', () => {
-  it('preserves migrations 1-6 and appends only migration 7 (execution receipt)', () => {
-    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  it('preserves migrations 1-6 and appends only migration 7 (execution receipt) after Phase 5', () => {
+    // Phase 4 adds no migration of its own: migrations 1-6 stay at the front,
+    // Phase 5 appends execution_receipts (7), and Phase 6 appends
+    // execution_plan_snapshots (8). This test pins the 1-6/7 boundary only.
+    expect(MIGRATIONS.slice(0, 7).map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(MIGRATIONS.slice(0, 6).map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6]);
     const up = MIGRATIONS.map((m) => m.up).join('\n').toLowerCase();
     expect(up).not.toContain('create table if not exists consistency');

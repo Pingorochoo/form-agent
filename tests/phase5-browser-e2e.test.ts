@@ -15,7 +15,7 @@ import { canonicalizeTarget } from '../src/policy/target.ts';
 import { RateStore } from '../src/policy/rate.ts';
 import { submissionKeyFor } from '../src/execution/receipt.ts';
 import { ExecutionPreSubmitError } from '../src/execution/errors.ts';
-import { EXECUTION_PRE_SUBMIT_CODES } from '../src/domain/execution.ts';
+import { EXECUTION_PRE_SUBMIT_CODES, EXECUTION_SNAPSHOT_CODES } from '../src/domain/execution.ts';
 import {
   allowFixture,
   makeConfig,
@@ -162,10 +162,10 @@ describe('P5-R15/R16 — ambiguous outcome and no-retry', () => {
 });
 
 describe('P5-R8 — plan approval', () => {
-  it('wrong planId aborts before fill', async () => {
+  it('a never-preflighted plan id aborts before fill (missing snapshot)', async () => {
     await expect(
       orchestrator('exec-success', 'seed-001').submit('f'.repeat(64), 'op'),
-    ).rejects.toMatchObject({ code: EXECUTION_PRE_SUBMIT_CODES.PLAN_MISMATCH });
+    ).rejects.toMatchObject({ code: EXECUTION_SNAPSHOT_CODES.NOT_FOUND });
   });
 });
 

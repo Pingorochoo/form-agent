@@ -21,8 +21,14 @@ import type { CanonicalTarget } from '../policy/target.ts';
  * changes in a way that must invalidate a prior plan identity. `planId`
  * incorporates this version so the same form evaluated under a different plan
  * contract yields a different identity.
+ *
+ * 2.0.0 (Phase 6): the operator-approved plan identity now also commits to the
+ * exact approved bundle content (`bundle_sha256`) and provider provenance
+ * (`provenance_hash`), so an approved planId can never be reused for different
+ * answer/profile/provenance content. Raw values are never identity material —
+ * only the content-bound hashes are.
  */
-export const EXECUTION_PLAN_VERSION = '1.0.0';
+export const EXECUTION_PLAN_VERSION = '2.0.0';
 
 /** Whether the browser-loaded form is currently accepting responses. */
 export type AcceptingState = 'accepting' | 'closed' | 'unknown';
@@ -182,10 +188,24 @@ export const EXECUTION_TERMINAL_CODES = {
   SUBMISSION_OUTCOME_UNKNOWN: 'SUBMISSION_OUTCOME_UNKNOWN',
 } as const;
 
+/**
+ * Stable execution-plan-snapshot reason codes (Phase 6, P6-R17). These are
+ * internal block/safety codes, not new process exit codes: they map onto the
+ * existing frozen exit-code contract (block -> 3) via `executionExitCode`.
+ */
+export const EXECUTION_SNAPSHOT_CODES = {
+  NOT_FOUND: 'EXECUTION_PLAN_SNAPSHOT_NOT_FOUND',
+  INVALID: 'EXECUTION_PLAN_SNAPSHOT_INVALID',
+  MISMATCH: 'EXECUTION_PLAN_SNAPSHOT_MISMATCH',
+  CONFLICT: 'EXECUTION_PLAN_SNAPSHOT_CONFLICT',
+} as const;
+
 export type ExecutionPreSubmitCode =
   (typeof EXECUTION_PRE_SUBMIT_CODES)[keyof typeof EXECUTION_PRE_SUBMIT_CODES];
 export type ExecutionTerminalCode =
   (typeof EXECUTION_TERMINAL_CODES)[keyof typeof EXECUTION_TERMINAL_CODES];
+export type ExecutionSnapshotCode =
+  (typeof EXECUTION_SNAPSHOT_CODES)[keyof typeof EXECUTION_SNAPSHOT_CODES];
 
 /**
  * The sections the orchestrator must walk, in order. Only sequential routing is

@@ -62,6 +62,11 @@ const EXECUTION_BLOCK_CODES: ReadonlySet<string> = new Set([
   'EXECUTION_PLAN_MISMATCH',
   'FORM_CHANGED_BEFORE_SUBMIT',
   'SUBMISSION_ALREADY_CLAIMED',
+  // Phase 6 snapshot blocks (missing/corrupt/mismatched/conflicting snapshot).
+  'EXECUTION_PLAN_SNAPSHOT_NOT_FOUND',
+  'EXECUTION_PLAN_SNAPSHOT_INVALID',
+  'EXECUTION_PLAN_SNAPSHOT_MISMATCH',
+  'EXECUTION_PLAN_SNAPSHOT_CONFLICT',
 ]);
 
 export function executionExitCode(code: ExecutionErrorCode): 1 | 2 | 3 {

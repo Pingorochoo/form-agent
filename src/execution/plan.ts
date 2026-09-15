@@ -55,6 +55,21 @@ export function derivePlanId(input: {
   );
 }
 
+/**
+ * Phase 6 approval-binding step: derive the operator-visible final planId from
+ * the accepted/base execution-plan identity plus the content-bound bundle
+ * digest and provider-provenance hash (P6 approval binding).
+ *
+ * This makes the externally approved `planId` commit to the exact approved
+ * DraftBundle and provider provenance. It never includes raw answer/profile
+ * values — only safe hashes. `bundleSha256` and `provenanceHash` are reused
+ * from the snapshot, so submit can recompute the same binding from the stored
+ * material with zero LLM calls.
+ */
+export function deriveApprovedPlanId(basePlanId: string, bundleSha256: string, provenanceHash: string): string {
+  return sha256Hex([basePlanId, bundleSha256, provenanceHash].join('\u0000'));
+}
+
 /** Count answered (fillable) vs blocked/deferred/unsupported draft results. */
 function countDraftStates(bundle: DraftBundle): { fillable: number; blocked: number } {
   let fillable = 0;

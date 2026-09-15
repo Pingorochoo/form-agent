@@ -31,13 +31,19 @@ import {
 import { RateStore } from '../policy/rate.ts';
 import { parseGoogleFormsHtml } from '../parser/google-forms.ts';
 import { DeterministicReferenceProvider } from '../draft/reference.ts';
+import type { DraftProvider } from '../draft/provider.ts';
 import { generateDraft } from '../draft/orchestrate.ts';
+import { DraftValidationError } from '../draft/errors.ts';
+import { serializeDraftBundle, bundleSha256, parseDraftBundleJson } from '../draft/serialize.ts';
+import { provenanceHash, type DraftProviderProvenance } from '../draft/provenance.ts';
 import { runConsistencyGate } from '../consistency/gate.ts';
-import { buildExecutionPlan } from './plan.ts';
+import { buildExecutionPlan, deriveApprovedPlanId } from './plan.ts';
 import { ReceiptStore, submissionKeyFor, type ExecutionReceipt, type ReceiptMetadata } from './receipt.ts';
+import { ExecutionPlanSnapshotStore } from './snapshot.ts';
 import { ExecutionPreSubmitError } from './errors.ts';
 import {
   EXECUTION_PRE_SUBMIT_CODES,
+  EXECUTION_SNAPSHOT_CODES,
   EXECUTION_TERMINAL_CODES,
   sequentialSections,
   type AcceptingState,
@@ -60,6 +66,12 @@ export interface OrchestratorOptions {
   /** Raw target string (pre-canonicalization) for the policy engine. */
   rawTarget: string;
   seed: string;
+  /** Selected DraftProvider (defaults to the deterministic reference). */
+  draftProvider?: DraftProvider;
+  /** Safe model/provider label for snapshot provenance + operator output. */
+  draftProviderModelLabel?: string | null;
+  /** Stable secret-free provenance (provider id/version/model/prompt/endpoint). */
+  draftProviderProvenance?: DraftProviderProvenance;
   /** Injected clock for deterministic rate evaluation. */
   nowMs?: () => number;
   /** Injected policy evaluator (test seam; defaults to the real engine). */
@@ -81,6 +93,8 @@ export interface PreflightResult {
   bundle: DraftBundle;
   report: ConsistencyReport;
   formTitle: string;
+  /** Safe provider provenance for operator output (no API keys or secrets). */
+  provenance: DraftProviderProvenance;
 }
 
 export interface SubmitResult {
@@ -98,10 +112,14 @@ export class ExecutionOrchestrator {
   private readonly target: CanonicalTarget;
   private readonly rawTarget: string;
   private readonly seed: string;
+  private readonly draftProvider: DraftProvider;
+  private readonly draftProviderModelLabel: string | null;
+  private readonly draftProviderProvenance: DraftProviderProvenance;
   private readonly nowMs: () => number;
   private readonly evaluatePolicy: (schema: FormSchema, nowMs: number) => RunPolicyDecision;
   private readonly receiptStore: ReceiptStore;
   private readonly rateStore: RateStore;
+  private readonly snapshotStore: ExecutionPlanSnapshotStore;
   private readonly policyEngine: ReturnType<typeof buildPolicyEngine>;
 
   constructor(options: OrchestratorOptions) {
@@ -112,6 +130,16 @@ export class ExecutionOrchestrator {
     this.target = options.target;
     this.rawTarget = options.rawTarget;
     this.seed = options.seed;
+    this.draftProvider = options.draftProvider ?? new DeterministicReferenceProvider();
+    this.draftProviderModelLabel = options.draftProviderModelLabel ?? null;
+    this.draftProviderProvenance =
+      options.draftProviderProvenance ?? {
+        providerId: this.draftProvider.id,
+        providerVersion: this.draftProvider.version,
+        modelLabel: this.draftProviderModelLabel,
+        promptContractVersions: '',
+        endpointHash: null,
+      };
     this.nowMs = options.nowMs ?? (() => Date.now());
 
     const engine = buildPolicyEngine(this.config, this.database, this.sensitiveRules);
@@ -123,6 +151,7 @@ export class ExecutionOrchestrator {
 
     this.receiptStore = new ReceiptStore(this.database);
     this.rateStore = new RateStore(this.database);
+    this.snapshotStore = new ExecutionPlanSnapshotStore(this.database);
   }
 
   /**
@@ -184,16 +213,25 @@ export class ExecutionOrchestrator {
     }
   }
 
-  /** Snapshot -> parse -> draft -> consistency -> policy -> plan. */
+  /**
+   * Snapshot -> parse -> draft (selected provider) -> consistency -> policy ->
+   * plan. Preflight only: this path MAY invoke a real LLM via the selected
+   * DraftProvider.
+   */
   private async computePlan(session: ExecutionSession): Promise<ComputedPlan> {
     const snapshot = await session.snapshot();
     const schema = this.parseRuntime(snapshot);
     const bundle = await generateDraft({
       schema,
       seed: this.seed,
-      provider: new DeterministicReferenceProvider(),
+      provider: this.draftProvider,
       sensitiveRules: this.sensitiveRules,
     });
+    return this.buildPlanFromBundle(schema, bundle);
+  }
+
+  /** Consistency + policy + plan from an already-produced bundle. NO LLM call. */
+  private async buildPlanFromBundle(schema: FormSchema, bundle: DraftBundle): Promise<ComputedPlan> {
     const report = await runConsistencyGate({ schema, bundle });
     const policy = this.evaluatePolicy(schema, this.nowMs());
     const plan = buildExecutionPlan({
@@ -267,22 +305,56 @@ export class ExecutionOrchestrator {
     return this.parseRuntime(snapshot);
   }
 
-  /** Preflight-only: plan, no fill, no submit (P5-R20). */
+  /** Preflight-only: plan, no fill, no submit (P5-R20, P6-R15). */
   async preflight(): Promise<PreflightResult> {
     this.assertAuthorized();
     const session = await this.provider.open(this.target, this.browserOptions());
     try {
       const computed = await this.computePlan(session);
       const accepting = await session.isAcceptingResponses();
-      const key = submissionKeyFor(this.target.key, computed.plan.planId);
-      const receipt = this.receiptStore.recordPreflight(key, this.receiptMetadata(computed.plan));
+
+      // P6-R15: persist the exact approved DraftBundle BEFORE returning the plan
+      // to the operator. This is NOT a submission claim and does not consume the
+      // submission key. The bundle is content-bound (SHA-256) and the provider
+      // provenance is content-bound (provenance_hash) so submit can detect any
+      // tampering of the approved plan before filling.
+      const bundleJson = serializeDraftBundle(computed.bundle);
+      const bundleDigest = bundleSha256(bundleJson);
+      const provenance = this.draftProviderProvenance;
+      const provHash = provenanceHash(provenance);
+
+      // Phase 6 approval binding: the operator-visible planId commits to the
+      // exact bundle content + provider provenance, so an approved planId can
+      // never be reused for different content.
+      const boundPlanId = deriveApprovedPlanId(computed.plan.planId, bundleDigest, provHash);
+      const plan = { ...computed.plan, planId: boundPlanId };
+
+      this.snapshotStore.save({
+        planId: boundPlanId,
+        targetKey: this.target.key,
+        fingerprint: plan.fingerprint,
+        draftId: plan.draftId,
+        consistencyReportId: plan.consistencyReportId,
+        draftProviderId: provenance.providerId,
+        draftProviderVersion: provenance.providerVersion,
+        modelOrProviderLabel: provenance.modelLabel,
+        promptContractVersions: provenance.promptContractVersions,
+        endpointHash: provenance.endpointHash,
+        provenanceHash: provHash,
+        bundleJson,
+        bundleSha256: bundleDigest,
+      });
+
+      const key = submissionKeyFor(this.target.key, boundPlanId);
+      const receipt = this.receiptStore.recordPreflight(key, this.receiptMetadata(plan));
       return {
-        plan: computed.plan,
+        plan,
         accepting,
         receipt,
         bundle: computed.bundle,
         report: computed.report,
         formTitle: computed.schema.title,
+        provenance,
       };
     } finally {
       await session.close();
@@ -294,16 +366,128 @@ export class ExecutionOrchestrator {
     this.assertAuthorized();
     const session = await this.provider.open(this.target, this.browserOptions());
     try {
-      const computed = await this.computePlan(session);
-      const plan = computed.plan;
+      const snapshot = await session.snapshot();
+      const schema = this.parseRuntime(snapshot);
 
-      // P5-R8: recompute the plan and require exact planId equality before fill.
-      if (plan.planId !== expectPlanId) {
-        const key = submissionKeyFor(this.target.key, plan.planId);
-        this.receiptStore.recordPreSubmitFailure(key, this.receiptMetadata(plan), 'aborted', EXECUTION_PRE_SUBMIT_CODES.PLAN_MISMATCH);
+      // P6-R16: load the exact persisted approved snapshot. NO LLM call occurs
+      // on the submit path — the stored bundle is reused verbatim.
+      const stored = this.snapshotStore.load(expectPlanId);
+      if (stored === null) {
         throw new ExecutionPreSubmitError(
-          EXECUTION_PRE_SUBMIT_CODES.PLAN_MISMATCH,
-          'current plan does not match the approved plan id',
+          EXECUTION_SNAPSHOT_CODES.NOT_FOUND,
+          'no approved plan snapshot exists for this plan id; run preflight first',
+        );
+      }
+
+      // P6-R17 (A): verify the bundle content digest BEFORE parsing/filling, so
+      // any byte or semantic change to the persisted bundle fails closed.
+      if (bundleSha256(stored.bundleJson) !== stored.bundleSha256) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.INVALID,
+          'approved plan snapshot bundle integrity digest mismatch',
+        );
+      }
+
+      // P6-R17 (B): verify the stored provider provenance is self-consistent
+      // (content-bound). Any tampering with a provenance column changes the
+      // recomputed hash and fails closed.
+      const recomputedProvenanceHash = provenanceHash({
+        providerId: stored.draftProviderId,
+        providerVersion: stored.draftProviderVersion,
+        modelLabel: stored.modelOrProviderLabel,
+        promptContractVersions: stored.promptContractVersions,
+        endpointHash: stored.endpointHash,
+      });
+      if (recomputedProvenanceHash !== stored.provenanceHash) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot provider provenance is inconsistent',
+        );
+      }
+
+      // P6-R17: validate identity/integrity before any fill.
+      if (stored.planId !== expectPlanId) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot identity does not match the expected plan id',
+        );
+      }
+      if (stored.targetKey !== this.target.key) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot target does not match this run',
+        );
+      }
+      if (stored.fingerprint !== schema.checksum) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'form structure changed since the plan was approved',
+        );
+      }
+
+      let bundle: DraftBundle;
+      try {
+        bundle = parseDraftBundleJson(stored.bundleJson, schema);
+      } catch (err) {
+        if (err instanceof DraftValidationError) {
+          throw new ExecutionPreSubmitError(
+            EXECUTION_SNAPSHOT_CODES.INVALID,
+            'approved plan snapshot bundle is corrupt',
+          );
+        }
+        throw err;
+      }
+
+      if (bundle.draftId !== stored.draftId) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot draft identity does not match the stored provenance',
+        );
+      }
+      // P6-R17 (B): the bundle's own provider identity must match the stored
+      // provenance (provider id/version cannot silently diverge).
+      if (bundle.providerId !== stored.draftProviderId) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot provider id does not match the stored bundle',
+        );
+      }
+      if (bundle.providerVersion !== stored.draftProviderVersion) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot provider version does not match the stored bundle',
+        );
+      }
+      if (bundle.fingerprint !== schema.checksum) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot bundle fingerprint does not match the runtime form',
+        );
+      }
+
+      // Re-run deterministic consistency on current schema + stored bundle; the
+      // reconstructed plan must reproduce the approved identity exactly.
+      const computed = await this.buildPlanFromBundle(schema, bundle);
+
+      // Phase 6 approval binding: recompute the final bound planId from the
+      // base plan identity + the STORED content/provenance hashes and require
+      // exact equality with --expect-plan BEFORE fill. A valid-to-valid answer/
+      // profile/provenance change — even with recomputed stored hashes — changes
+      // this binding and can no longer match the old approved planId.
+      const boundPlanId = deriveApprovedPlanId(computed.plan.planId, stored.bundleSha256, stored.provenanceHash);
+      if (boundPlanId !== expectPlanId) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan no longer matches the approved snapshot (approval binding failed)',
+        );
+      }
+      const plan = { ...computed.plan, planId: boundPlanId };
+
+      // P6-R17: require the expected deterministic consistency report identity.
+      if (computed.report.reportId !== stored.consistencyReportId) {
+        throw new ExecutionPreSubmitError(
+          EXECUTION_SNAPSHOT_CODES.MISMATCH,
+          'approved plan snapshot consistency report identity changed',
         );
       }
 

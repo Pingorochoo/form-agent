@@ -31,7 +31,7 @@ afterEach(() => {
 describe('migration catalog', () => {
   it('adds the authorizations migration without editing earlier ones', () => {
     const ids = MIGRATIONS.map((m) => m.id);
-    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     const authz = MIGRATIONS.find((m) => m.id === 5);
     expect(authz?.name).toBe('authorizations');
     expect(authz?.up).toContain('CREATE TABLE IF NOT EXISTS authorizations');

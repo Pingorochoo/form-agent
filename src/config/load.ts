@@ -105,7 +105,7 @@ function ensureFakeProvider(config: AppConfig): AppConfig {
     ...config,
     llm: {
       ...config.llm,
-      providers: { ...providers, fake: { type: 'fake', enabled: true } },
+      providers: { ...providers, fake: { type: 'fake', enabled: true, allowRemote: false } },
     },
   };
 }

@@ -30,7 +30,7 @@ function metadata(overrides: Partial<ReceiptMetadata> = {}): ReceiptMetadata {
 
 describe('P5-R17 — migration 7', () => {
   it('appends migration 7 without changing migrations 1-6', () => {
-    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(MIGRATIONS.slice(0, 7).map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(MIGRATIONS.slice(0, 6).map((m) => m.name)).toEqual([
       'meta_applied_at',
       'forms_and_form_schema',
@@ -46,13 +46,13 @@ describe('P5-R17 — migration 7', () => {
     const { database, dir, cleanup } = makeDatabase();
     try {
       const applied = database.db
-        .prepare('SELECT id FROM schema_migrations ORDER BY id')
+        .prepare('SELECT id FROM schema_migrations WHERE id <= 7 ORDER BY id')
         .all() as Array<{ id: number }>;
       expect(applied.map((r) => r.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
 
       // Reopen the same database: no error, same applied set.
       const reopened = FormAgentDatabase.open({ directory: dir, filename: 'form-agent.db' });
-      const after = reopened.db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get() as { n: number };
+      const after = reopened.db.prepare('SELECT COUNT(*) AS n FROM schema_migrations WHERE id <= 7').get() as { n: number };
       expect(after.n).toBe(7);
       reopened.close();
     } finally {

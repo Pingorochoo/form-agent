@@ -35,6 +35,7 @@ import type {
 import type { DraftProvider, MaybePromise } from './provider.ts';
 import { validateDraftValue, validateSemanticModel, validateSyntheticProfile } from './validate.ts';
 import { DraftSeedError, DraftValidationError } from './errors.ts';
+import { LlmProviderError } from '../llm/errors.ts';
 
 /** Accepted Phase 1 structural kinds that Phase 3 may draft (P3-R9). */
 export const SUPPORTED_DRAFT_KINDS: ReadonlySet<string> = new Set([
@@ -90,13 +91,16 @@ export interface GenerateDraftOptions {
  * Invoke a provider stage. Every exception raised inside the provider boundary
  * is untrusted (a future provider may throw a DraftError with a raw provider
  * message or token), so ALL of them are wrapped into a stable, sanitized
- * stage error. Orchestration/validator errors raised OUTSIDE the provider
- * invocation are unaffected.
+ * stage error — EXCEPT stable `LlmProviderError`s, which already carry
+ * sanitized, stable codes that the CLI maps onto the frozen exit-code contract.
+ * Orchestration/validator errors raised OUTSIDE the provider invocation are
+ * unaffected.
  */
 async function callProviderStage<T>(stage: string, run: () => MaybePromise<T>): Promise<T> {
   try {
     return await run();
-  } catch {
+  } catch (err) {
+    if (err instanceof LlmProviderError) throw err;
     throw new DraftValidationError(`draft provider failed during ${stage}`);
   }
 }

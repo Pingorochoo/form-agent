@@ -12,7 +12,25 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export const PROVIDER_TYPES = ['openai-compatible', 'fake'] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
 
+/**
+ * Draft-provider selection (Phase 6). `reference` is the deterministic,
+ * network-free fallback (accepted Phase 3); `openai-compatible` is the first
+ * real network LLM provider family wired against the same DraftProvider
+ * boundary. This is intentionally distinct from the low-level text-chat
+ * `providers` record above.
+ */
+export const DRAFT_PROVIDER_TYPES = ['reference', 'openai-compatible'] as const;
+export type DraftProviderType = (typeof DRAFT_PROVIDER_TYPES)[number];
+
 export const SENSITIVE_FIELD_NAMES = ['Email', 'Phone', 'ApiKey', 'GoogleFormResponseId', 'SpecificInput'] as const;
+
+/**
+ * Conservative Phase 6 transport defaults (P6-R9 / docs/PHASE_6.md §8).
+ * Bounded timeout and bounded response body are applied at the transport layer
+ * and never derived from provider output.
+ */
+export const DEFAULT_LLM_TIMEOUT_MS = 60_000;
+export const DEFAULT_LLM_MAX_RESPONSE_BYTES = 2 * 1024 * 1024; // 2 MiB
 
 const llmProviderSchema = z.object({
   type: z.enum(PROVIDER_TYPES).optional(),
@@ -20,6 +38,12 @@ const llmProviderSchema = z.object({
   apiKeyEnv: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
   timeoutMs: z.number().int().positive().optional(),
+  /** Explicit opt-in for any non-loopback LLM endpoint (P6-R5). */
+  allowRemote: z.boolean().default(false),
+  /** Bounded output token request, only sent when explicitly configured. */
+  maxOutputTokens: z.number().int().positive().optional(),
+  /** Bounded response body (bytes) before JSON parsing (P6-R9). */
+  maxResponseBytes: z.number().int().positive().optional(),
   enabled: z.boolean().default(true),
 });
 
@@ -28,6 +52,8 @@ const llmSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.2),
   maxTokens: z.number().int().positive().default(2048),
   enableCaching: z.boolean().default(true),
+  /** Selected DraftProvider for draft-producing flows; default network-free. */
+  draftProvider: z.enum(DRAFT_PROVIDER_TYPES).default('reference'),
   providers: z.record(llmProviderSchema).default({}),
 });
 
