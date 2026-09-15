@@ -1,7 +1,8 @@
 ---
 description: Implements exactly one accepted project phase with bounded autonomous work and verifiable evidence
 mode: primary
-model: deepseek/deepseek-v4-pro#high
+model: deepseek/deepseek-flash
+variant: high
 steps: 120
 
 permission:
