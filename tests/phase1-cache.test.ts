@@ -34,9 +34,9 @@ describe('cache / persistence', () => {
     // Migrations 1-4 are the accepted Phase 0/1 catalog and must never be
     // edited. Phase 2 appends authorizations (5) and rate_events (6); Phase 5
     // appends execution_receipts (7); Phase 6 appends execution_plan_snapshots
-    // (8).
+    // (8); Phase 7 appends metrics_events (9).
     expect(MIGRATIONS.slice(0, 4).map((m) => m.id)).toEqual([1, 2, 3, 4]);
-    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it('persists the schema into form_schema + analysis_cache keyed by fingerprint', () => {

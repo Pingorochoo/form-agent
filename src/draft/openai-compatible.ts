@@ -112,14 +112,17 @@ export class OpenAiCompatibleDraftProvider implements DraftProvider {
       throw new LlmProviderError(LLM_ERROR_CODES.OFFLINE, 'LLM provider failed during stage');
     }
 
+    // P7-R10a: provider token fields are only persisted when they were usable
+    // (a real 0 is preserved; invalid/missing values are omitted -> SQL NULL).
+    const usage = result.usage;
     this.safeRecordCall({
       providerId: this.id,
       model: this.model,
       stage,
       status: 'success',
-      inputTokens: result.usage.inputTokens,
-      outputTokens: result.usage.outputTokens,
-      totalTokens: result.usage.totalTokens,
+      ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
+      ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
+      ...(usage.totalTokens !== undefined ? { totalTokens: usage.totalTokens } : {}),
       durationMs: result.latencyMs,
       finishReason: result.finishReason,
     });

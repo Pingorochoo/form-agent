@@ -7,6 +7,9 @@
  * snapshot, execution receipt, or provider error prose.
  */
 
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ExecutionOrchestrator } from '../src/execution/orchestrate.ts';
@@ -162,6 +165,9 @@ describe('P6-R10/R15 — secret sentinel safety', () => {
 describe('Finding G — CLI-level secret regression', () => {
   function cliConfig(stubUrl: string): AppConfig {
     const config = defaultConfig();
+    // Phase 7 requires draft/check to attempt the audit-only DB open, so point
+    // the CLI at an isolated temp database rather than the repo-local default.
+    config.database.directory = mkdtempSync(join(tmpdir(), 'form-agent-p6-secret-'));
     config.llm.providers = {
       'openai-compatible': {
         type: 'openai-compatible',

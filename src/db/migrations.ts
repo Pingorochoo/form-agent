@@ -222,6 +222,44 @@ export const MIGRATIONS: Migration[] = [
         ON execution_plan_snapshots(target_key);
     `,
   },
+  {
+    id: 9,
+    name: 'metrics_events',
+    up: `
+      -- Append-only, narrowly scoped operational metric-event store (Phase 7).
+      --
+      -- Stores ONLY the bounded Phase 7 metric catalog: a fixed event name, a
+      -- fixed kind, a numeric value for count/duration_ms OR a bounded
+      -- categorical value, and a normalized wall-clock event time. There is no
+      -- free-form attributes/dimension map and no raw/unbounded text: the
+      -- runtime validator rejects any event outside the closed catalog by
+      -- construction. Never stores answers, profile values, question/choice
+      -- text, HTML, prompts/responses, credentials, cookies, or raw exceptions.
+      --
+      -- Execution/Llm dimensions are derived read-only from the authoritative
+      -- execution_receipts / llm_calls tables; they are deliberately NOT
+      -- duplicated here. This table is never part of any authoritative
+      -- receipt/claim transaction.
+      CREATE TABLE IF NOT EXISTS metrics_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        value_num REAL,
+        value_text TEXT,
+        at_ms INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK (kind IN ('count','duration_ms','categorical')),
+        CHECK (at_ms >= 0),
+        CHECK (value_num IS NULL OR value_num >= 0),
+        CHECK (
+          (kind = 'categorical' AND value_text IS NOT NULL AND value_num IS NULL) OR
+          (kind IN ('count','duration_ms') AND value_num IS NOT NULL AND value_text IS NULL)
+        )
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_metrics_events_at ON metrics_events(at_ms);
+      CREATE INDEX IF NOT EXISTS idx_metrics_events_event ON metrics_events(event, at_ms);
+    `,
+  },
 ];
 
 export function migrationMap(): Map<number, Migration> {

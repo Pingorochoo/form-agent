@@ -73,7 +73,8 @@ function snapshotInput(planId: string, bundleJson: string, overrides: Partial<Ex
 
 describe('P6-R14 — migration 8', () => {
   it('appends migration 8 without changing migrations 1-7', () => {
-    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    // Phase 7 appends metrics_events (9) after migration 8.
+    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(MIGRATIONS[7]?.name).toBe('execution_plan_snapshots');
     // Migrations 1-7 names are unchanged.
     expect(MIGRATIONS.slice(0, 7).map((m) => m.name)).toEqual([
@@ -91,11 +92,11 @@ describe('P6-R14 — migration 8', () => {
     const { database, dir, cleanup } = makeDatabase();
     try {
       const applied = database.db.prepare('SELECT id FROM schema_migrations ORDER BY id').all() as Array<{ id: number }>;
-      expect(applied.map((r) => r.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(applied.map((r) => r.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
       const reopened = FormAgentDatabase.open({ directory: dir, filename: 'form-agent.db' });
       const after = reopened.db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get() as { n: number };
-      expect(after.n).toBe(8);
+      expect(after.n).toBe(9);
       reopened.close();
     } finally {
       cleanup();

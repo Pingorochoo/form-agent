@@ -23,6 +23,7 @@
     "verify:phase4": "vitest run tests/phase4-consistency.test.ts tests/phase4-integrity.test.ts tests/phase4-profile.test.ts tests/phase4-relationships.test.ts tests/phase4-cli.test.ts tests/phase4-no-execution.test.ts",
     "verify:phase5": "vitest run tests/phase5-plan.test.ts tests/phase5-receipt.test.ts tests/phase5-policy-gates.test.ts tests/phase5-cli.test.ts tests/phase5-no-evasion.test.ts tests/phase5-browser-e2e.test.ts tests/phase5-smoke.test.ts tests/phase5-review.test.ts",
     "verify:phase6": "vitest run tests/phase6-provider-config.test.ts tests/phase6-openai-compatible.test.ts tests/phase6-provider-stages.test.ts tests/phase6-plan-snapshot.test.ts tests/phase6-cli.test.ts tests/phase6-run-snapshot-e2e.test.ts tests/phase6-no-secret.test.ts tests/phase6-no-network.test.ts tests/phase6-smoke.test.ts",
+    "verify:phase7": "vitest run tests/phase7-metrics-migration.test.ts tests/phase7-metrics-store.test.ts tests/phase7-metrics-instrumentation.test.ts tests/phase7-llm-audit-fidelity.test.ts tests/phase7-metrics-aggregate.test.ts tests/phase7-time-filter.test.ts tests/phase7-export-format.test.ts tests/phase7-metrics-cli.test.ts tests/phase7-no-secret.test.ts tests/phase7-lifecycle-e2e.test.ts",
     "fixture:sanitize": "node scripts/sanitize-observed-form.mjs",
     "fixture:decode": "node scripts/decode-observed-form.mjs",
     "setup:browser": "playwright install chromium"

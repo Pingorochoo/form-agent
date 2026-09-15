@@ -19,6 +19,9 @@ import { GoogleFormsParseError } from '../parser/google-forms.ts';
 import { ExitCodes } from './exit-codes.ts';
 import { buildPolicyEngine, formatRunPolicySummary } from '../policy/policyEngine.ts';
 import { loadSensitiveRules, resolveSensitiveRules, PolicyConfigError } from '../policy/policy-config.ts';
+import { METRIC_EVENTS } from '../metrics/catalog.ts';
+import { startTimer, systemMetricsClock, type MetricsClock } from '../metrics/clock.ts';
+import { createMetricsRecorder } from '../metrics/store.ts';
 
 export class NotImplementedError extends Error {
   constructor(command: string) {
@@ -30,6 +33,11 @@ export class NotImplementedError extends Error {
 export interface CliContext {
   config: AppConfig;
   logger: Logger;
+  /**
+   * Optional injected clock for deterministic Phase 7 metrics timing in tests.
+   * Production calls leave this undefined and use the system monotonic clock.
+   */
+  metricsClock?: MetricsClock;
 }
 
 function notImplemented(command: string): never {
@@ -76,9 +84,17 @@ export async function handleCmdAnalyze(
     throw err;
   }
 
+  // The business operation starts here (after all usage/input resolution): the
+  // duration event is recorded on success OR controlled failure from now on.
+  const timer = startTimer(ctx.metricsClock ?? systemMetricsClock);
   const database = FormAgentDatabase.open({
     directory: ctx.config.database.directory,
     filename: ctx.config.database.filename,
+  });
+  const recorder = createMetricsRecorder({
+    database,
+    onWarning: () => ctx.logger.warn('metrics recording skipped'),
+    ...(ctx.metricsClock !== undefined ? { clock: ctx.metricsClock } : {}),
   });
   try {
     const store = new AnalysisStore(database);
@@ -104,6 +120,7 @@ export async function handleCmdAnalyze(
     }
     throw err;
   } finally {
+    recorder.recordDuration(METRIC_EVENTS.COMMAND_ANALYZE_DURATION, timer.elapsedMs());
     database.close();
   }
 }
@@ -173,11 +190,6 @@ export async function handleCmdProviderWhere(ctx: CliContext): Promise<number> {
   return ExitCodes.SUCCESS;
 }
 
-export async function handleCmdMetrics(ctx: CliContext): Promise<number> {
-  void ctx;
-  notImplemented('metrics');
-}
-
 export function handleCmdHelp(): number {
   makeCliSink()(
     [
@@ -203,7 +215,10 @@ export function handleCmdHelp(): number {
       '                                      Submit an approved plan (explicit approval)',
       '  form-agent provider <id> --validate  Check an LLM provider',
       '  form-agent provider where           List configured providers',
-      '  form-agent metrics                  Show run metrics (not implemented)',
+      '  form-agent metrics summary [--since <ISO8601>] [--until <ISO8601>]',
+      '                                      Show bounded operational metrics',
+      '  form-agent metrics export --format json|csv [--since <ISO8601>] [--until <ISO8601>]',
+      '                                      Export deterministic machine-readable metrics',
       '  form-agent --version                Print version',
       '  form-agent --help                   This help',
       '',

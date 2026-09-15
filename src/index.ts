@@ -1,9 +1,8 @@
 /**
  * form-agent CLI entry point.
  *
- * Phase 0: config loading + `provider` command functional; analyze / preview /
- * plan / run / metrics / file are scaffolded not-implemented commands with a
- * stable exit-code contract.
+ * Phase 0: config loading + `provider` command functional; preview / plan / file
+ * are scaffolded not-implemented commands with a stable exit-code contract.
  */
 
 import { loadConfig, type LoadedConfig } from './config/load.ts';
@@ -13,7 +12,6 @@ import {
   NotImplementedError,
   handleCmdAnalyze,
   handleCmdFile,
-  handleCmdMetrics,
   handleCmdPlan,
   handleCmdPreview,
   handleCmdProviderValidate,
@@ -25,6 +23,7 @@ import { handleCmdAuth } from './cli/auth.ts';
 import { handleCmdDraft } from './cli/draft.ts';
 import { handleCmdCheck } from './cli/check.ts';
 import { handleCmdRun } from './cli/run.ts';
+import { handleCmdMetrics } from './cli/metrics.ts';
 
 export const VERSION = '0.1.0';
 
@@ -81,7 +80,7 @@ async function runArgv(argv: string[]): Promise<number> {
     case 'run':
       return await handleCmdRun(rest, ctx);
     case 'metrics':
-      return await handleCmdMetrics(ctx);
+      return await handleCmdMetrics(rest, ctx);
     case 'provider': {
       const providerId = rest[0];
       if (providerId === undefined) {

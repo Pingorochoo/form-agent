@@ -39,7 +39,12 @@ export interface OpenAiCompatibleResult {
   content: string;
   model: string;
   finishReason: string;
-  usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+  /**
+   * Provider-supplied usage. A token field is `undefined` when the provider did
+   * not supply a usable value (P7-R10a): missing, string, negative, fractional,
+   * non-finite, or otherwise invalid. A genuinely supplied `0` is preserved.
+   */
+  usage: { inputTokens: number | undefined; outputTokens: number | undefined; totalTokens: number | undefined };
   latencyMs: number;
 }
 
@@ -132,10 +137,12 @@ function parseEnvelope(payload: string): { content: string; model: string; finis
   }
 
   const usageRaw = record['usage'];
+  const usageRecord =
+    typeof usageRaw === 'object' && usageRaw !== null ? (usageRaw as Record<string, unknown>) : null;
   const usage = {
-    inputTokens: typeof usageRaw === 'object' && usageRaw !== null ? toInt((usageRaw as Record<string, unknown>)['prompt_tokens']) : 0,
-    outputTokens: typeof usageRaw === 'object' && usageRaw !== null ? toInt((usageRaw as Record<string, unknown>)['completion_tokens']) : 0,
-    totalTokens: typeof usageRaw === 'object' && usageRaw !== null ? toInt((usageRaw as Record<string, unknown>)['total_tokens']) : 0,
+    inputTokens: usageRecord === null ? undefined : toUsableTokenCount(usageRecord['prompt_tokens']),
+    outputTokens: usageRecord === null ? undefined : toUsableTokenCount(usageRecord['completion_tokens']),
+    totalTokens: usageRecord === null ? undefined : toUsableTokenCount(usageRecord['total_tokens']),
   };
 
   const model = typeof record['model'] === 'string' ? record['model'] : 'unknown';
@@ -147,8 +154,17 @@ function parseEnvelope(payload: string): { content: string; model: string; finis
   return { content, model, finishReason, usage };
 }
 
-function toInt(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : 0;
+/**
+ * P7-R10a: a usable provider token count is a finite, safe, non-negative
+ * integer. A real `0` is preserved; missing/string/negative/fractional/
+ * non-finite values become `undefined` (persisted as SQL NULL) and are never
+ * fabricated.
+ */
+function toUsableTokenCount(value: unknown): number | undefined {
+  if (typeof value !== 'number') return undefined;
+  if (!Number.isSafeInteger(value)) return undefined;
+  if (value < 0) return undefined;
+  return value;
 }
 
 function isAbortError(err: unknown): boolean {

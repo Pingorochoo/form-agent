@@ -21,6 +21,8 @@ import { LlmProviderError, llmExitCode } from '../llm/errors.ts';
 import { draftToJson, formatDraftHuman } from '../draft/format.ts';
 import { ExitCodes } from './exit-codes.ts';
 import type { CliContext } from './index.ts';
+import { METRIC_EVENTS } from '../metrics/catalog.ts';
+import { openAuditMetrics, recordDraftSummary } from '../metrics/instrument.ts';
 
 interface DraftArgs {
   input: string | undefined;
@@ -135,40 +137,64 @@ export async function handleCmdDraft(args: string[], ctx: CliContext): Promise<n
   }
 
   let selectedProvider;
+  // P7-R11: best-effort audit-only DB open so real-provider `draft` calls are
+  // instrumented in `llm_calls`. The open is not optional; a failure must not
+  // change stdout/JSON/exit/business result.
+  const audit = openAuditMetrics({
+    directory: ctx.config.database.directory,
+    filename: ctx.config.database.filename,
+    logger: ctx.logger,
+    ...(ctx.metricsClock !== undefined ? { clock: ctx.metricsClock } : {}),
+  });
   try {
-    selectedProvider = resolveDraftProvider(draftProvider, { config: ctx.config });
-  } catch (err) {
-    if (err instanceof LlmProviderError) {
-      ctx.logger.error(err.message);
-      return llmExitCode(err.code);
+    try {
+      selectedProvider = resolveDraftProvider(draftProvider, {
+        config: ctx.config,
+        ...(audit.recordCall !== undefined ? { recordCall: audit.recordCall } : {}),
+      });
+    } catch (err) {
+      if (err instanceof LlmProviderError) {
+        ctx.logger.error(err.message);
+        return llmExitCode(err.code);
+      }
+      throw err;
     }
-    throw err;
-  }
 
-  let bundle;
-  try {
-    bundle = await generateDraft({
-      schema,
-      seed,
-      provider: selectedProvider.provider,
-      sensitiveRules,
-    });
-  } catch (err) {
-    if (err instanceof LlmProviderError) {
-      ctx.logger.error(err.message);
-      return llmExitCode(err.code);
+    const timer = audit.startTimer();
+    let bundle;
+    try {
+      bundle = await generateDraft({
+        schema,
+        seed,
+        provider: selectedProvider.provider,
+        sensitiveRules,
+      });
+    } catch (err) {
+      if (err instanceof LlmProviderError) {
+        ctx.logger.error(err.message);
+        return llmExitCode(err.code);
+      }
+      if (err instanceof DraftError) {
+        ctx.logger.error(err.message);
+        return ExitCodes.VALIDATION;
+      }
+      throw err;
+    } finally {
+      // Started => recorded, on success or controlled failure (P7-R7).
+      audit.recorder.recordDuration(METRIC_EVENTS.COMMAND_DRAFT_DURATION, timer.elapsedMs());
     }
-    if (err instanceof DraftError) {
-      ctx.logger.error(err.message);
-      return ExitCodes.VALIDATION;
-    }
-    throw err;
-  }
 
-  if (json) {
-    process.stdout.write(`${JSON.stringify(draftToJson(bundle), null, 2)}\n`);
-  } else {
-    process.stdout.write(`${formatDraftHuman(bundle)}\n`);
+    // Only recorded when the DraftBundle exists (P7-R3/R8). `draft` never runs
+    // the consistency gate, so no consistency events are recorded.
+    recordDraftSummary(audit.recorder, bundle.summary);
+
+    if (json) {
+      process.stdout.write(`${JSON.stringify(draftToJson(bundle), null, 2)}\n`);
+    } else {
+      process.stdout.write(`${formatDraftHuman(bundle)}\n`);
+    }
+    return ExitCodes.SUCCESS;
+  } finally {
+    audit.close();
   }
-  return ExitCodes.SUCCESS;
 }

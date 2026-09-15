@@ -30,6 +30,10 @@ import { LlmProviderError, llmExitCode } from '../llm/errors.ts';
 import { LlmCallStore } from '../llm/audit.ts';
 import { ConsistencyError } from '../consistency/errors.ts';
 import { formatPreflightHuman, formatSubmitHuman, preflightToJson, submitToJson } from '../execution/format.ts';
+import { METRIC_EVENTS } from '../metrics/catalog.ts';
+import { startTimer, systemMetricsClock } from '../metrics/clock.ts';
+import { createMetricsRecorder } from '../metrics/store.ts';
+import { recordConsistencySummary, recordDraftSummary } from '../metrics/instrument.ts';
 
 const PLAN_ID_PATTERN = /^[a-f0-9]{64}$/;
 const MAX_OPERATOR_LENGTH = 200;
@@ -169,6 +173,12 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
     directory: ctx.config.database.directory,
     filename: ctx.config.database.filename,
   });
+  const clock = ctx.metricsClock ?? systemMetricsClock;
+  const recorder = createMetricsRecorder({
+    database,
+    onWarning: () => ctx.logger.warn('metrics recording skipped'),
+    ...(ctx.metricsClock !== undefined ? { clock: ctx.metricsClock } : {}),
+  });
   try {
     let fixtureBaseUrl: string | undefined;
     if (canonical.kind === 'fixture' && fixtureScenario(canonical) !== null) {
@@ -228,20 +238,49 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
     }
 
     if (value.submit) {
-      const result = await orchestrator.submit(value.expectPlan as string, (value.by as string).trim());
-      if (value.json) {
-        process.stdout.write(`${JSON.stringify(submitToJson(result), null, 2)}\n`);
-      } else {
-        process.stdout.write(`${formatSubmitHuman({ plan: result.plan, receipt: result.receipt, outcome: result.outcome })}\n`);
+      // `run --submit` contributes ONLY command.run.submit.duration from
+      // metrics_events; execution outcomes remain derived from receipts and the
+      // preflight draft/consistency set is never duplicated here.
+      const timer = startTimer(clock);
+      try {
+        const result = await orchestrator.submit(value.expectPlan as string, (value.by as string).trim());
+        if (value.json) {
+          process.stdout.write(`${JSON.stringify(submitToJson(result), null, 2)}\n`);
+        } else {
+          process.stdout.write(`${formatSubmitHuman({ plan: result.plan, receipt: result.receipt, outcome: result.outcome })}\n`);
+        }
+        return result.outcome === 'success' ? ExitCodes.SUCCESS : ExitCodes.ERROR;
+      } finally {
+        recorder.recordDuration(METRIC_EVENTS.COMMAND_RUN_SUBMIT_DURATION, timer.elapsedMs());
       }
-      return result.outcome === 'success' ? ExitCodes.SUCCESS : ExitCodes.ERROR;
     }
 
-    const result = await orchestrator.preflight();
-    if (value.json) {
-      process.stdout.write(
-        `${JSON.stringify(
-          preflightToJson({
+    const timer = startTimer(clock);
+    try {
+      const result = await orchestrator.preflight();
+      // Recorded only on success, when the DraftBundle/consistency report
+      // exists. No new business stage is executed to emit a metric.
+      recordDraftSummary(recorder, result.bundle.summary);
+      recordConsistencySummary(recorder, result.report);
+      if (value.json) {
+        process.stdout.write(
+          `${JSON.stringify(
+            preflightToJson({
+              plan: result.plan,
+              bundle: result.bundle,
+              report: result.report,
+              accepting: result.accepting,
+              receipt: result.receipt,
+              formTitle: result.formTitle,
+              provenance: result.provenance,
+            }),
+            null,
+            2,
+          )}\n`,
+        );
+      } else {
+        process.stdout.write(
+          `${formatPreflightHuman({
             plan: result.plan,
             bundle: result.bundle,
             report: result.report,
@@ -249,25 +288,13 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
             receipt: result.receipt,
             formTitle: result.formTitle,
             provenance: result.provenance,
-          }),
-          null,
-          2,
-        )}\n`,
-      );
-    } else {
-      process.stdout.write(
-        `${formatPreflightHuman({
-          plan: result.plan,
-          bundle: result.bundle,
-          report: result.report,
-          accepting: result.accepting,
-          receipt: result.receipt,
-          formTitle: result.formTitle,
-          provenance: result.provenance,
-        })}\n`,
-      );
+          })}\n`,
+        );
+      }
+      return ExitCodes.SUCCESS;
+    } finally {
+      recorder.recordDuration(METRIC_EVENTS.COMMAND_RUN_PREFLIGHT_DURATION, timer.elapsedMs());
     }
-    return ExitCodes.SUCCESS;
   } catch (err) {
     if (err instanceof LlmProviderError) {
       ctx.logger.error(err.message);

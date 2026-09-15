@@ -23,6 +23,8 @@ import { ConsistencyError } from '../consistency/errors.ts';
 import { checkToJson, formatCheckHuman } from '../consistency/format.ts';
 import { ExitCodes } from './exit-codes.ts';
 import type { CliContext } from './index.ts';
+import { METRIC_EVENTS } from '../metrics/catalog.ts';
+import { openAuditMetrics, recordConsistencySummary, recordDraftSummary } from '../metrics/instrument.ts';
 
 interface CheckArgs {
   input: string | undefined;
@@ -138,52 +140,70 @@ export async function handleCmdCheck(args: string[], ctx: CliContext): Promise<n
   }
 
   let selectedProvider;
+  // P7-R11: best-effort audit-only DB open so real-provider `check` calls are
+  // instrumented in `llm_calls`. The open is not optional; a failure must not
+  // change stdout/JSON/exit/business result.
+  const audit = openAuditMetrics({
+    directory: ctx.config.database.directory,
+    filename: ctx.config.database.filename,
+    logger: ctx.logger,
+    ...(ctx.metricsClock !== undefined ? { clock: ctx.metricsClock } : {}),
+  });
   try {
-    selectedProvider = resolveDraftProvider(draftProvider, { config: ctx.config });
-  } catch (err) {
-    if (err instanceof LlmProviderError) {
-      ctx.logger.error(err.message);
-      return llmExitCode(err.code);
+    try {
+      selectedProvider = resolveDraftProvider(draftProvider, {
+        config: ctx.config,
+        ...(audit.recordCall !== undefined ? { recordCall: audit.recordCall } : {}),
+      });
+    } catch (err) {
+      if (err instanceof LlmProviderError) {
+        ctx.logger.error(err.message);
+        return llmExitCode(err.code);
+      }
+      throw err;
     }
-    throw err;
-  }
 
-  let bundle;
-  try {
-    bundle = await generateDraft({
-      schema,
-      seed,
-      provider: selectedProvider.provider,
-      sensitiveRules,
-    });
-  } catch (err) {
-    if (err instanceof LlmProviderError) {
-      ctx.logger.error(err.message);
-      return llmExitCode(err.code);
+    const timer = audit.startTimer();
+    let bundle;
+    let report;
+    try {
+      bundle = await generateDraft({
+        schema,
+        seed,
+        provider: selectedProvider.provider,
+        sensitiveRules,
+      });
+      recordDraftSummary(audit.recorder, bundle.summary);
+
+      report = await runConsistencyGate({ schema, bundle });
+      recordConsistencySummary(audit.recorder, report);
+    } catch (err) {
+      if (err instanceof LlmProviderError) {
+        ctx.logger.error(err.message);
+        return llmExitCode(err.code);
+      }
+      if (err instanceof DraftError) {
+        ctx.logger.error(err.message);
+        return ExitCodes.VALIDATION;
+      }
+      if (err instanceof ConsistencyError) {
+        ctx.logger.error(err.message);
+        return ExitCodes.VALIDATION;
+      }
+      throw err;
+    } finally {
+      // Started => recorded, on success or controlled failure (P7-R7).
+      audit.recorder.recordDuration(METRIC_EVENTS.COMMAND_CHECK_DURATION, timer.elapsedMs());
     }
-    if (err instanceof DraftError) {
-      ctx.logger.error(err.message);
-      return ExitCodes.VALIDATION;
+
+    if (json) {
+      process.stdout.write(`${JSON.stringify(checkToJson(bundle, report), null, 2)}\n`);
+    } else {
+      process.stdout.write(`${formatCheckHuman(bundle.formTitle, bundle.formId, report)}\n`);
     }
-    throw err;
-  }
 
-  let report;
-  try {
-    report = await runConsistencyGate({ schema, bundle });
-  } catch (err) {
-    if (err instanceof ConsistencyError) {
-      ctx.logger.error(err.message);
-      return ExitCodes.VALIDATION;
-    }
-    throw err;
+    return report.blocking ? ExitCodes.VALIDATION : ExitCodes.SUCCESS;
+  } finally {
+    audit.close();
   }
-
-  if (json) {
-    process.stdout.write(`${JSON.stringify(checkToJson(bundle, report), null, 2)}\n`);
-  } else {
-    process.stdout.write(`${formatCheckHuman(bundle.formTitle, bundle.formId, report)}\n`);
-  }
-
-  return report.blocking ? ExitCodes.VALIDATION : ExitCodes.SUCCESS;
 }
