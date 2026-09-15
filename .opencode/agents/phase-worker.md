@@ -17,6 +17,7 @@ permission:
     "AGENT_HANDOFF.md": deny
     "docs/PHASE_1.md": deny
     "docs/PHASE_2.md": deny
+    "docs/PHASE_3.md": deny
     "docs/phase0.md": deny
     ".opencode/agents/*": deny
     "**/.env": deny
