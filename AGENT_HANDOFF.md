@@ -18,23 +18,25 @@ Permanent agent rules belong in `AGENTS.md`.
 | Phase 2 | **COMPLETE and ACCEPTED** |
 | Phase 2 baseline | `e5b4c2e` — `feat: complete phase 2 policy and authorization` |
 | Phase 3 | **COMPLETE and ACCEPTED** |
-| Accepted implementation baseline | `19b312a` — `feat: complete phase 3 synthetic drafting` |
-| Phase 4 | **NOT STARTED** |
-| Next phase | **Phase 4 — deterministic consistency gate** |
-| Current phase spec | `docs/PHASE_4.md` — planning document, not implementation |
-| Full regression at Phase 3 acceptance | **376 passing across 30 files** |
-| Phase 3 targeted verification | **107 passing across 7 files** |
+| Phase 3 baseline | `19b312a` — `feat: complete phase 3 synthetic drafting` |
+| Phase 4 | **COMPLETE and ACCEPTED** |
+| Accepted implementation baseline | `0cda0ff` — `feat: complete phase 4 consistency gate` |
+| Phase 5 | **NOT STARTED** |
+| Next phase | **Phase 5 — controlled browser execution** |
+| Current phase spec | `docs/PHASE_5.md` — planning document, not implementation |
+| Full regression at Phase 4 acceptance | **441 passing across 36 files** |
+| Phase 4 targeted verification | **65 passing across 6 files** |
 | Typecheck / build | **clean** |
-| Working tree at Phase 3 acceptance | **clean** |
-| Accepted DB migrations | **1-6, unchanged by Phase 3** |
+| Working tree at Phase 4 acceptance | **clean** |
+| Accepted DB migrations | **1-6** |
 
-Phase 0 through Phase 3 are accepted work.
+Phase 0 through Phase 4 are accepted work.
 
-`19b312a` is the trusted accepted code baseline until Phase 4 itself is
-implemented, independently reviewed, and committed.
+`0cda0ff` is the trusted accepted implementation baseline until Phase 5 itself
+is implemented, independently reviewed, and committed.
 
-Planning documentation for Phase 4 may be newer than the accepted
-implementation baseline. Planning commits do not replace `19b312a` as the
+Planning documentation for Phase 5 may be newer than the accepted
+implementation baseline. A planning commit does not replace `0cda0ff` as the
 accepted implementation baseline.
 
 Do not broadly reconstruct, re-audit, or reimplement accepted earlier phases.
@@ -52,11 +54,11 @@ If sources conflict, earlier items win:
 5. this handoff.
 
 Accepted Git history is a trusted baseline, not an invitation to repeatedly
-re-derive earlier phases.
+re-derive prior phases.
 
 Inspect accepted earlier-phase code only when:
 
-- Phase 4 directly depends on that interface;
+- Phase 5 directly depends on that interface;
 - a relevant regression fails; or
 - repository evidence contradicts a documented contract.
 
@@ -67,18 +69,17 @@ Inspect accepted earlier-phase code only when:
 - `src/domain/`
   - provider-neutral pure domain models;
   - structural schema/fingerprint types;
-  - semantic/profile/draft domain types;
-  - must remain free of DB, network, browser, filesystem, or provider-specific
-    I/O.
+  - semantic/profile/draft/consistency domain types;
+  - no DB, filesystem, browser, network, or provider-specific I/O.
 
 - `src/config/`
   - Zod-based configuration and config discovery;
-  - accepted Phase 2 safety/rate configuration.
+  - accepted safety/rate configuration.
 
 - `src/cli/`
   - CLI handlers;
   - frozen exit-code contract;
-  - accepted analyze/auth/draft commands.
+  - accepted analyze/auth/draft/check commands.
 
 - `src/db/`
   - `better-sqlite3`;
@@ -87,31 +88,32 @@ Inspect accepted earlier-phase code only when:
   - idempotent append-only migrations.
 
 - `src/parser/google-forms.ts`
-  - accepted Phase 1 offline Google Forms structural parser.
+  - accepted Phase 1 Google Forms structural parser;
+  - consumes responder HTML;
+  - provider-neutral `FormSchema`.
 
 - `src/analyze/`
-  - accepted Phase 1 local input resolution;
-  - structural analysis;
-  - cache/persistence integration;
-  - human-readable summary.
+  - accepted local/fixture input resolution;
+  - structural analysis and cache integration.
 
 - `src/policy/`
-  - accepted Phase 2 policy layer;
-  - target canonicalization;
+  - accepted target canonicalization;
   - authorization;
   - sensitive-field classification;
-  - policy-file loading;
   - central `PolicyEngine`;
-  - deterministic rate gate/state;
-  - stable reason codes.
+  - deterministic durable rate state;
+  - stable policy reason codes.
 
 - `src/draft/`
-  - accepted Phase 3 semantic/profile/draft orchestration;
-  - provider-neutral async-compatible draft provider boundary;
+  - accepted Phase 3 semantics/profile/draft orchestration;
   - deterministic reference provider;
-  - structural answer validation;
-  - safe formatting;
-  - no execution.
+  - structural answer validation.
+
+- `src/consistency/`
+  - accepted Phase 4 deterministic consistency gate;
+  - provider-neutral comparison/rules/report formatting;
+  - no authorization;
+  - no browser execution.
 
 - `src/llm/`
   - Phase 0 provider/foundation abstractions;
@@ -121,8 +123,7 @@ Inspect accepted earlier-phase code only when:
   - redaction and structured logging.
 
 - `src/fixtures/`
-  - sanitized fixture/archive loading;
-  - embedded-payload decoding.
+  - sanitized fixture/archive loading.
 
 - `bin/form-agent.js`
   - CLI launcher.
@@ -130,10 +131,14 @@ Inspect accepted earlier-phase code only when:
 Permanent boundaries:
 
 - `src/domain/` remains pure and provider-neutral.
-- parsing remains separate from semantic/profile/draft logic;
-- policy authorization remains separate from consistency;
-- consistency must remain separate from browser execution;
-- only the PolicyEngine may decide future execution authorization.
+- structural parsing does not decide policy.
+- draft generation does not authorize execution.
+- consistency does not authorize execution.
+- browser/provider code does not decide whether submission is legal.
+- the Phase 2 `PolicyEngine` remains the authority for future run
+  authorization/safety/rate eligibility.
+- Phase 5 orchestration may sequence those accepted components, but must not
+  duplicate their decision logic.
 
 ---
 
@@ -143,12 +148,12 @@ Phase 1 is accepted at `309f097`.
 
 The structural parser:
 
-- parses sanitized responder-page HTML offline;
+- parses sanitized responder-page HTML;
 - extracts the accepted embedded Google Forms payload;
 - produces provider-neutral `FormSchema`;
 - preserves question ordering and section assignment;
 - derives required state;
-- performs no network, browser, submission, or LLM activity.
+- performs no browser fill or submission.
 
 Accepted fixture-validated structural kinds:
 
@@ -163,7 +168,8 @@ Accepted fixture-validated structural kinds:
 
 Distinct unvalidated/deferred kinds remain conservative `unsupported`.
 
-Malformed non-array payload items fail with controlled `GoogleFormsParseError`.
+Malformed non-array payload items fail with controlled
+`GoogleFormsParseError`.
 
 Linear-scale bounds use numeric step labels when available.
 
@@ -173,7 +179,7 @@ Do not invent undocumented Google Forms payload indices.
 
 ## Deferred structural behavior
 
-Still deliberately unvalidated/deferred:
+Still deliberately deferred:
 
 - dropdown;
 - rating;
@@ -188,13 +194,15 @@ Accepted type `7` behavior remains:
 
 Accepted routing remains sequential.
 
-Do not broaden parser support during Phase 4.
+Phase 5 may execute only the accepted single-select grid representation.
+
+Do not broaden the parser merely to make browser execution easier.
 
 ---
 
-## Accepted real fixture
+## Accepted observed fixture
 
-Authoritative sanitized fixture:
+Authoritative sanitized structural fixture:
 
 `fixtures/archives/observed-responder.html`
 
@@ -229,37 +237,41 @@ Accepted structural fingerprint:
 
 `7335cdcceb9056de39a12615a62d4cec96e0b147e4b661fca7aa70b6a6a5ad5e`
 
-Phase 4 must preserve this fingerprint.
+Phase 5 must preserve this fingerprint.
+
+Important Phase 5 consequence:
+
+The observed fixture contains a field classified by the accepted policy as
+sensitive/`never`. The full Phase 2 `PolicyEngine` therefore blocks execution of
+that fixture under the accepted policy.
+
+**Do not weaken Phase 2 policy just to make the observed fixture executable.**
+
+Phase 5 successful browser-submit E2E coverage should use a separate,
+purpose-built local execution fixture/harness with no policy-blocked sensitive
+fields.
+
+The observed fixture remains a structural/regression fixture.
 
 ---
 
-## Analyze / cache contract
+## Accepted local analyze/draft/check boundary
 
-Accepted local analysis inputs include:
+`analyze`, `draft`, and `check` currently accept local/fixture inputs.
+
+Accepted local inputs include:
 
 - sanitized local file path;
 - fixture id;
 - fixture URL handled by the local fixture harness.
 
-Live HTTP Google Forms fetching is NOT implemented.
+Live external Google Forms URLs remain rejected by those commands.
 
-A live Google Forms URL must not be fetched by `analyze`, `draft`, or Phase 4
-local checking.
+Phase 5 must not silently turn `analyze`, `draft`, or `check` into network
+commands.
 
-Analysis remains:
-
-- offline;
-- fixture-read-only;
-- submission-free.
-
-Structural schemas are persisted by structural fingerprint.
-
-Fingerprinting excludes ephemeral invocation metadata.
-
-On cache hit, accepted behavior reuses the structural schema while preserving
-current-invocation metadata.
-
-Phase 1 parser generator version remains accepted as implemented.
+`run` becomes the only Phase 5 command allowed to use the browser/network
+execution provider, under explicit authorization and execution gates.
 
 ---
 
@@ -271,35 +283,30 @@ Core principle:
 
 **future execution is denied by default.**
 
-Successful parsing, fixture presence, previous analysis, cache state, form
-identity, draft generation, or consistency success must never implicitly grant
-execution authorization.
+Successful parsing, fixture presence, previous analysis, cache state, draft
+generation, consistency PASS/WARN, or browser reachability must never implicitly
+grant execution authorization.
 
 Accepted Phase 2 capabilities include:
 
-- explicit durable target authorization;
-- authorization inspection;
-- revocation with retained history;
+- durable target authorization;
+- authorization inspection/revocation;
 - canonical target identity;
 - deterministic sensitive-field classification;
-- configurable JSON/YAML/YML sensitivity policy files;
+- configurable policy files;
 - central `PolicyEngine`;
-- stable policy reason codes;
 - safety-mode gate;
-- deterministic durable rate-policy state;
-- policy visibility in `analyze`;
-- local-only `auth` CLI.
-
-Authorization is not execution.
+- durable deterministic rate state;
+- stable machine-readable reason codes.
 
 Authorization does not imply:
 
 - sensitive-field permission;
 - answer approval;
 - consistency approval;
-- human approval;
+- operator approval;
 - rate eligibility;
-- browser permission;
+- browser fill permission;
 - submission.
 
 ---
@@ -310,32 +317,36 @@ Canonical target handling is pure and performs no network access.
 
 For HTTP(S) targets:
 
-- query parameters are excluded from canonical identity/display;
+- query parameters are excluded from identity/display;
 - fragments are excluded;
 - URL userinfo is excluded;
 - non-default ports remain part of identity;
 - default ports normalize;
-- Google Forms recognition requires the supported exact hostname;
+- Google Forms recognition requires the accepted exact hostname;
 - audited display must not echo URL secrets.
 
-Do not regress these audit-safety guarantees.
+Phase 5 must canonicalize before any browser activity.
+
+Execution provider support must not broaden authorization to arbitrary URLs.
 
 ---
 
 ## Accepted sensitive-field policy
 
-Phase 2 sensitivity classification is deterministic and LLM-free.
+Phase 2 sensitivity classification remains deterministic and LLM-free.
 
-Effective sensitivity mode uses the most restrictive matching policy:
+Effective restrictiveness:
 
 `never > specific-authorization > human-reviewed > synthetic-allowed`
 
-File upload remains always sensitive and `never` in the accepted MVP.
+File upload remains always sensitive and `never` in the MVP.
 
-Phase 3 consumes sensitivity classification before profile answer-like trait
-generation and before per-question answer generation.
+Phase 3 classifies sensitivity before answer-like profile state and answer
+generation.
 
-Phase 4 must not weaken or bypass that ordering.
+Blocked questions carry no generated value.
+
+Phase 5 must never reconstruct or invent values for blocked questions.
 
 ---
 
@@ -343,42 +354,51 @@ Phase 4 must not weaken or bypass that ordering.
 
 The full future-run policy path requires a `FormSchema`.
 
-`evaluateRunPolicy(...)` performs the mandatory sensitive pre-scan and must not
-return an allowed decision without it.
+`evaluateRunPolicy(...)` performs:
 
-The separate authorization-only API may evaluate authorization without a
-schema.
+- authorization;
+- safety-mode gate;
+- mandatory sensitive pre-scan;
+- rate gate.
 
-Policy evaluation remains decision-making only.
+The accepted safety-eligible mode is `test-only`.
 
-It performs no:
+The full policy result is the authority for whether a run may continue toward
+execution.
 
-- browser execution;
-- network fetch;
-- submission;
-- scheduling;
-- human-like pacing;
-- answer generation;
-- consistency repair.
+The authorization-only API may be called without a schema.
 
-Phase 4 consistency results are an additional quality gate, not a replacement
-for PolicyEngine authorization.
+Phase 5 should use that authorization-only API before external network/browser
+access, then the full policy path before fill and again immediately before
+submission.
+
+Policy decision-making itself performs no browser/submission side effects.
 
 ---
 
-## Accepted rate contract
+## Accepted rate behavior
 
-Rate policy is deterministic.
+Rate policy remains deterministic.
 
-When several time-based gates block simultaneously, `retryAfterMs` means the
-time until all current time-based blockers can clear, therefore the maximum
-applicable remaining duration.
+Accepted controls include:
 
-Injected-time snapshots ignore future events.
+- minimum delay;
+- hourly cap;
+- daily cap;
+- batch pause;
+- concurrent-batch cap;
+- configured jitter field.
 
-Rolling windows use consistent lower-bound semantics.
+Phase 2 does not sleep or apply random pacing.
 
-Phase 4 must not add sleeps, pacing, scheduling, or rate mutation.
+Phase 5 should continue to fail with deterministic retry-after information
+rather than sleep.
+
+`jitterFactor` remains configuration only unless a later explicit phase changes
+that contract.
+
+Unknown/ambiguous submission attempts must count conservatively against
+submission rate limits.
 
 ---
 
@@ -386,122 +406,37 @@ Phase 4 must not add sleeps, pacing, scheduling, or rate mutation.
 
 Phase 3 is accepted at `19b312a`.
 
-Conceptual accepted pipeline:
+Accepted flow:
 
 ```text
 FormSchema
     ↓
-whole-form semantic interpretation
+whole-form semantics
     ↓
-Phase 2 sensitivity pre-classification
+sensitivity pre-classification
     ↓
-synthetic respondent profile
+synthetic profile
     ↓
-per-question draft generation using same semantics/profile
+per-question draft proposals
     ↓
-structural answer validation
+structural validation
     ↓
 DraftBundle
 ```
 
-Phase 3 is local and creates draft data only.
-
-It does not fetch live forms, use a browser, submit forms, or call a real model.
-
----
-
-## Accepted Phase 3 provider boundary
-
-The draft provider boundary is async-compatible.
-
-Provider stages may return synchronous values or promises through the accepted
-`MaybePromise<T>` contract.
-
-The orchestrator awaits provider stages.
-
-The deterministic reference provider remains synchronous internally, but future
-async providers can replace it without rewriting the draft pipeline.
-
-Every exception originating inside a provider stage is treated as untrusted and
-wrapped in a stable sanitized draft error.
-
-Provider-originated raw error messages/tokens must not escape through normal CLI
-behavior.
-
----
-
-## Accepted Phase 3 semantic model behavior
-
-Whole-form semantics cover:
-
-- topic;
-- purpose;
-- target audience/respondent context;
-- section semantics;
-- one semantic entry per schema question;
-- structured question tags;
-- relationships between real schema questions.
-
-Phase 3 runtime validation requires exact question and section coverage.
-
-Semantic provider output must not:
-
-- omit question entries;
-- omit section entries;
-- invent unknown question/section identifiers;
-- mismatch embedded IDs with map keys;
-- omit the per-question `relationships` array;
-- contain malformed relationship objects;
-- reference unknown relationship targets;
-- contain duplicate relationships;
-- contain malformed/unknown/missing structured-question tags.
-
-Provider output remains untrusted until validated.
-
----
-
-## Accepted Phase 3 synthetic profile behavior
-
-Profiles are explicitly synthetic.
-
-A profile contains provider-neutral synthetic state including:
-
-- identity;
-- latent traits;
-- facts;
-- form/semantic references;
-- profile identity/provenance.
-
-Sensitivity is classified before profile generation.
-
-The provider receives only the sensitivity-filtered eligible question-id set for
-answer-like latent-trait derivation.
-
-Blocked questions must not contribute generated answer-like profile values.
-
-The accepted reference provider uses deterministic seeded generation.
-
-Profile identity/RNG material includes stable eligibility material so different
-effective eligibility cannot alias to the same profile identity/content.
-
----
-
-## Accepted Phase 3 DraftBundle behavior
-
 `DraftBundle` includes:
 
-- explicit synthetic provenance;
 - seed;
-- stable draft identity;
+- deterministic draft identity;
 - provider id/version;
-- accepted structural fingerprint;
+- structural fingerprint;
 - form identity;
-- validated semantic model;
+- semantics;
 - one synthetic profile;
-- exactly one per-question draft result;
-- summary/completeness.
+- one result per schema question;
+- explicit completeness summary.
 
-Accepted per-question states include:
+Per-question states include:
 
 - `answered`;
 - `blocked-sensitive`;
@@ -510,122 +445,133 @@ Accepted per-question states include:
 - `unsupported`;
 - `validation-error`.
 
-A required question counts as satisfied only by a structurally valid non-empty
-`answered` result.
+Phase 5 may fill only accepted `answered` values.
 
-Required blocked/unsupported/invalid questions make the bundle incomplete.
-
-Phase 3 never invents a value merely to make a required question complete.
+Blocked/deferred/unsupported states are never converted into browser values.
 
 ---
 
-## Accepted Phase 3 structural validation
+## Accepted Phase 3 structural answer validation
 
-Every accepted `answered` value is validated against its actual `FormSchema`
-question.
+Accepted `answered` values already satisfy provider-neutral structural checks:
 
-Accepted guards include:
+- text/paragraph non-empty;
+- single-choice uses real choice;
+- multi-choice non-empty, real choices, deduplicated;
+- linear-scale integer in bounds;
+- grid uses real rows/columns;
+- required grid covers every real row;
+- valid date;
+- valid time.
 
-- text/paragraph values must be non-empty after trimming;
-- single-choice values must be real choices;
-- multi-choice must be non-empty, contain only real choices, and deduplicate;
-- linear-scale must be an integer inside accepted bounds;
-- grid rows/columns must exist;
-- a required grid must answer every real row;
-- date/time values must satisfy accepted representation/ranges;
-- unsupported kinds remain unsupported.
+Browser execution must still verify that the DOM actually reflects the intended
+accepted value after fill.
 
-Structural validation is not semantic consistency validation.
-
-Cross-answer/profile semantic consistency belongs to Phase 4.
+Structural validity in memory does not prove DOM fill succeeded.
 
 ---
 
-## Accepted Phase 3 deterministic identity
+## Accepted Phase 3 determinism and secret safety
 
-The accepted reference contract is deterministic.
+Same accepted schema + seed + provider contract + effective policy produces a
+reproducible draft.
 
-Same:
+`profileId`/`draftId` incorporate stable eligibility/effective-policy material.
 
-- schema/fingerprint;
-- explicit seed;
-- provider id/version;
-- effective sensitivity outcomes;
+Provider exceptions are sanitized.
 
-produces reproducible profile/draft identities and content.
+Unknown CLI flags do not echo raw token-bearing input.
 
-`profileId` includes stable order-independent eligibility material.
-
-`draftId` includes stable effective-policy material plus the resulting
-`profileId`.
-
-Raw custom regex patterns, secrets, and wall-clock data are not identity inputs.
+Do not regress those contracts in `run`.
 
 ---
 
-## Accepted Phase 3 CLI and secret safety
+## Accepted Phase 4 consistency behavior
 
-Implemented Phase 3 command:
+Phase 4 is accepted at `0cda0ff`.
+
+Consistency gate version:
+
+`1.0.0`
+
+Public boundary is async-compatible:
 
 ```text
-form-agent draft <input> --seed <seed> [--json]
+runConsistencyGate({ schema, bundle }) → Promise<ConsistencyReport>
 ```
 
-Accepted input forms mirror local analyze inputs.
+Accepted semantics:
 
-Live external forms are rejected without fetch.
+- no issues → `pass`, non-blocking;
+- soft issues only → `warn`, non-blocking;
+- any hard issue → `block`, blocking.
 
-CLI parsing is strict:
+The gate is read-only.
 
-- unknown flags are usage errors;
-- unknown-flag messages do not echo raw flag contents;
-- `--seed` requires a following non-flag value;
-- `--seed=` may not be empty;
-- extra positional inputs are rejected.
+It does not:
 
-Human output states explicitly that no submission occurred.
+- mutate draft values;
+- repair contradictions;
+- authorize execution;
+- submit anything.
 
-Structured draft JSON may contain eligible synthetic values because it is the
-explicit draft result.
+Stable hard-capable issue codes include:
 
-It must not contain generated values for policy-blocked questions.
+- `SCHEMA_FINGERPRINT_MISMATCH`
+- `FORM_ID_MISMATCH`
+- `PROFILE_FORM_MISMATCH`
+- `DRAFT_RESULT_COVERAGE_MISMATCH`
+- `DRAFT_RESULT_KIND_MISMATCH`
+- `REQUIRED_QUESTION_UNANSWERED`
+- `DRAFT_VALIDATION_ERROR`
+- `PROFILE_TRAIT_MISMATCH`
+- `REPETITION_ANSWER_MISMATCH`
 
-Normal errors/logs must not echo provider secrets or arbitrary rejected provider
-values.
+Stable soft issue codes include:
 
----
+- `REPETITION_POSSIBLE_MISMATCH`
+- `RELATIONSHIP_NOT_FULLY_CHECKED`
 
-## Independent Phase 3 review corrections now part of baseline
+Phase 5 must refuse a consistency `block`.
 
-The accepted Phase 3 baseline includes all independent-review corrections.
-
-Important contracts to preserve:
-
-1. draft provider boundary is async-compatible;
-2. sensitivity classification occurs before profile answer-like trait generation;
-3. semantic output requires exact complete validated structural references;
-4. provider/validation/CLI errors do not echo untrusted secret-bearing values;
-5. empty/partial invalid answers cannot satisfy required completeness;
-6. CLI flags are parsed strictly;
-7. every semantic question entry requires `relationships`;
-8. every provider-thrown exception is sanitized at the provider boundary;
-9. unknown CLI flags use stable non-echoing text;
-10. profile/draft identities incorporate effective eligibility/policy inputs.
-
-Do not regress these contracts.
+A consistency `warn` remains non-blocking, but must be visible in preflight and
+receipt metadata.
 
 ---
 
-## Accepted verification at Phase 3 baseline
+## Accepted Phase 4 review corrections
 
-Final independent verification before commit `19b312a`:
+Independent review corrections are part of the accepted baseline.
+
+Preserve all three:
+
+1. **Report provenance**
+   - report fingerprint identifies the schema actually evaluated;
+   - `reportId` uses `schema.checksum`, not a stale bundle fingerprint.
+
+2. **Integrity before semantic comparison**
+   - invalid schema/bundle integrity stops profile/relationship comparison;
+   - duplicate result ids do not use last-write-wins.
+
+3. **Relationship ordering**
+   - repetition pairs are explicitly ordered by accepted schema order;
+   - semantically equivalent relationship-array ordering cannot change issue
+     ordering/report identity.
+
+Do not regress these when Phase 5 re-runs consistency during execution.
+
+---
+
+## Accepted verification at Phase 4 baseline
+
+Final independent verification before commit `0cda0ff`:
 
 ```text
-npm run verify:phase3
-→ 107 passing across 7 files
+npm run verify:phase4
+→ 65 passing across 6 files
 
 npm test
-→ 376 passing across 30 files
+→ 441 passing across 36 files
 
 npm run typecheck
 → clean
@@ -637,7 +583,7 @@ git diff --check
 → clean
 ```
 
-Accepted fixture fingerprint remained unchanged.
+Accepted observed-fixture fingerprint remained unchanged.
 
 After commit, working tree was clean.
 
@@ -645,25 +591,27 @@ After commit, working tree was clean.
 
 ## Database state
 
-Accepted migrations are **1-6**.
+Accepted migrations are currently **1-6**.
 
 Migrations 1-4 are accepted earlier-phase migrations.
 
 Phase 2 appended:
 
-- migration 5 — durable authorization records/history;
-- migration 6 — durable rate events/state.
+- migration 5 — authorization history;
+- migration 6 — rate events/state.
 
-Phase 3 added no migration.
+Phases 3 and 4 added no migration.
 
-Do not mutate accepted migration definitions.
+Phase 5 is the first phase where a new durable execution receipt/submission
+claim is justified.
 
-Phase 4 is expected to remain ephemeral/in-memory and add no migration.
+`docs/PHASE_5.md` permits **one append-only migration 7** for the minimal
+execution-receipt / crash-safe submission-claim contract.
 
-If Phase 4 implementation appears to require persistence, STOP and report the
-conflict before adding a migration.
+Do not mutate migrations 1-6.
 
-The normal local database remains gitignored under `.data/`.
+Do not add migration 8 or a broad batch/preview schema without stopping and
+reporting the need first.
 
 ---
 
@@ -672,18 +620,20 @@ The normal local database remains gitignored under `.data/`.
 - `0` success
 - `1` error
 - `2` usage/config
-- `3` validation
+- `3` validation/policy/consistency block
 - `4` LLM offline
 - `5` LLM connectivity
 - `127` unknown command
 
 Codes `6-126` remain reserved.
 
-Do not renumber or repurpose accepted codes without an explicit specification
-change.
+Phase 5 should reuse this mapping.
 
-Phase 4 consistency hard-blocks should use the existing validation semantics,
-not invent a new exit code.
+Do not invent a "submission unknown" process exit code.
+
+Unknown submission outcome should be represented in the structured execution
+receipt/result and use the accepted generic error path unless
+`docs/PHASE_5.md` explicitly defines a more precise use of the existing codes.
 
 ---
 
@@ -691,182 +641,346 @@ not invent a new exit code.
 
 Implemented:
 
-- version/help foundation;
+- version/help;
 - provider inspection/validation foundation;
-- `analyze` for accepted local/fixture inputs;
+- `analyze`;
 - `auth allow`;
 - `auth check`;
 - `auth list`;
 - `auth revoke`;
-- `draft <input> --seed <seed> [--json]`.
+- `draft <input> --seed <seed> [--json]`;
+- `check <input> --seed <seed> [--json]`.
 
-Still intentionally unavailable:
+Still unavailable at the accepted Phase 4 baseline:
 
 - `preview`;
 - `plan`;
 - `run`;
-- browser execution;
+- browser fill;
 - submission.
 
-Phase 4 may add only the local consistency-inspection CLI explicitly described
-by `docs/PHASE_4.md`.
+Phase 5 implements `run` only as specified by `docs/PHASE_5.md`.
 
-Do not repurpose `preview` or `run` during Phase 4.
+Do not repurpose `preview` or `plan` unless the Phase 5 specification is
+explicitly amended before implementation.
 
 ---
 
 ## Current LLM/provider state
 
-No accepted real cloud/local provider inference exists yet.
+No accepted real cloud/local inference exists yet.
 
-Phase 3 provides the deterministic reference semantic/profile/draft provider.
+Phase 3 uses the deterministic reference provider.
 
-Phase 4 must remain deterministic and model-free in its accepted path.
+Phase 4 is deterministic/model-free.
 
-The consistency API should remain compatible with a future optional async
-holistic pass, but Phase 4 must not call a real model.
+Phase 5 remains model-free.
 
-Real cloud/local-model inference remains Phase 6.
+Real LLM wiring remains Phase 6.
+
+Browser execution is not an excuse to introduce cloud inference.
 
 ---
 
-## Phase 4 objective
+## Phase 5 objective
 
 Next phase:
 
-**Phase 4 — Deterministic Consistency Gate**
+**Phase 5 — Controlled Browser Execution**
 
-Phase 4 has NOT started.
+Phase 5 has NOT started.
 
 Detailed contract:
 
-`docs/PHASE_4.md`
+`docs/PHASE_5.md`
 
-High-level flow:
+High-level execution flow:
 
 ```text
-FormSchema + accepted DraftBundle
-              ↓
-      deterministic consistency gate
-              ↓
-      stable ConsistencyReport
-         ├─ PASS
-         ├─ WARN  (soft issues)
-         └─ BLOCK (hard issues)
+CLI run request
+    ↓
+strict argument validation
+    ↓
+canonical target + authorization-only preflight
+    ↓
+browser opens authorized execution target
+    ↓
+runtime FormSchema snapshot
+    ↓
+deterministic DraftBundle
+    ↓
+ConsistencyReport
+    ↓
+ExecutionPlan / planId
+    ↓
+full PolicyEngine gate
+    ↓
+explicit operator approval for submit mode
+    ↓
+fill + DOM verification
+    ↓
+runtime fingerprint re-check
+    ↓
+full PolicyEngine gate again
+    ↓
+durable submit claim + rate event
+    ↓
+ONE submit attempt
+    ↓
+confirmed success OR unknown_outcome
+    ↓
+durable safe receipt
 ```
 
-The gate checks coherence; it does not rewrite answers.
+---
 
-It must remain provider-neutral and deterministic.
+## Locked Phase 5 safety decisions
+
+Unless repository evidence proves a conflict, Phase 5 planning assumes:
+
+1. **Playwright + Chromium**
+   - one isolated non-persistent browser context per execution;
+   - deterministic finite timeouts;
+   - guaranteed teardown in `finally`.
+
+2. **Run defaults to preflight**
+   - `form-agent run <target> --seed <seed>` does NOT fill or submit;
+   - it returns an execution plan and `planId`.
+
+3. **Submission requires explicit approval**
+   - actual submission requires `--submit`;
+   - requires `--expect-plan <planId>`;
+   - requires an explicit operator identity (`--by <operator>`);
+   - missing approval arguments fail before network/browser use.
+
+4. **Authorization before network**
+   - canonicalize target first;
+   - authorization-only `run` gate before any external page open.
+
+5. **Full PolicyEngine twice**
+   - once before fill;
+   - again immediately before submit.
+
+6. **Consistency is mandatory**
+   - BLOCK stops execution;
+   - WARN may continue but is surfaced.
+
+7. **No random/human imitation**
+   - no randomized delays;
+   - no stealth;
+   - no CAPTCHA bypass;
+   - no anti-bot evasion.
+
+8. **Single response per command**
+   - no scheduler;
+   - no batch worker;
+   - no repeated submissions.
+
+9. **Ambiguous submit is never retried**
+   - once durable submit intent exists, no automatic retry;
+   - unconfirmed post-submit state becomes `unknown_outcome`.
+
+10. **Durable submission claim**
+    - migration 7 stores safe receipt metadata;
+    - claim is persisted before click;
+    - a crash after claim cannot turn into an automatic duplicate retry.
+
+11. **No stored credentials**
+    - non-persistent browser context;
+    - no login automation;
+    - forms requiring sign-in/consent/captcha fail closed.
+
+12. **External support is narrow**
+    - exact supported Google Forms responder targets only;
+    - local execution harness for tests;
+    - no arbitrary URL browser automation.
 
 ---
 
-## Phase 4 design direction
+## Phase 5 executable question kinds
 
-Phase 4 should detect consistency problems across:
+Phase 5 should execute all accepted Phase 1/3 answer kinds:
 
-- schema ↔ DraftBundle identity/integrity;
-- required/completeness state;
-- profile ↔ answer values where the accepted structured evidence is direct;
-- answer ↔ answer relationships where deterministic evidence is strong enough;
-- semantic relationships where they can be evaluated without guessing.
+- text;
+- paragraph-text;
+- single-choice;
+- multi-choice;
+- linear-scale;
+- multiple-choice-grid with accepted `selectionMode: 'single'`;
+- date;
+- time.
 
-Hard issues block future preview/run consumption.
+Earlier architecture notes deferred generic grid/matrix fill.
 
-Soft issues surface as warnings.
+Repository reality now has an accepted, structurally validated single-select
+grid representation and the observed fixture contains four such grids.
 
-The accepted MVP rule remains:
+Therefore Phase 5 may implement **only that accepted single-select grid shape**.
 
-**hard-block on hard issues; warn on soft issues.**
+Checkbox-grid detection/execution remains deferred.
 
-The gate must not silently repair, replace, regenerate, or mutate answers.
-
----
-
-## Conservative consistency principle
-
-Do not turn uncertain semantic heuristics into hard blockers.
-
-The accepted Phase 3 deterministic semantic provider can infer `repetition`
-relationships from identical normalized titles.
-
-That evidence is useful, but identical wording across different sections is not
-automatically proof that two answers must be identical.
-
-Phase 4 must therefore use explicit deterministic evidence and conservative
-severity rules described in `docs/PHASE_4.md`.
-
-Do not invent domain knowledge such as:
-
-- age ↔ seniority;
-- degree ↔ job role;
-- address relationships;
-- "none of the above" exclusivity;
-- conditional question implications;
-
-unless the accepted structured model explicitly represents the needed
-constraint.
+If repository/DOM evidence shows the accepted single-select grid cannot be
+filled safely without broad parser changes, STOP and report the conflict rather
+than silently skipping an `answered` field.
 
 ---
 
-## Consistency is not authorization
+## Browser locator direction
 
-A `PASS` consistency report does NOT mean:
+Use resilient user-facing/accessibility locators where possible.
 
-- target is allowlisted;
-- sensitivity permits execution;
-- safety mode is eligible;
-- rate gates permit execution;
-- operator approved execution;
-- browser execution is allowed;
-- submission may occur.
+Prefer:
 
-The future execution path must satisfy both consistency and PolicyEngine
-requirements independently.
+- role;
+- label;
+- accessible name;
+- validated question container scope.
+
+Do not use global title text alone as identity because duplicate titles exist.
+
+Do not use `force: true` to bypass Playwright actionability.
+
+Any necessary provider-specific CSS/XPath fallback should be isolated in the
+Google Forms locator module and regression-tested.
+
+DOM lookup failure must fail closed before submit.
 
 ---
 
-## Phase 4 must NOT implement
+## Sequential sections
 
-Do not implement during Phase 4:
+The accepted structural routing is sequential.
 
-- live Google Forms fetching;
-- browser automation;
-- Playwright;
-- form submission;
-- `run`;
-- preview approval workflow;
-- batch scheduling;
-- submission workers;
-- sleep/random pacing;
+Phase 5 may navigate accepted multi-section forms by the known section order.
+
+It must verify expected progression.
+
+Unexpected branching, hidden conditional flow, login wall, consent wall, or
+unknown section behavior must abort.
+
+Do not implement conditional-routing inference in Phase 5.
+
+---
+
+## Runtime fingerprint rule
+
+The browser-loaded schema is the structural truth for the execution plan.
+
+Actual submit mode must recompute the same plan from the current runtime form.
+
+After fill, and immediately before submit:
+
+- re-acquire the runtime form structure;
+- parse it through accepted structural logic;
+- compare the current checksum with the plan checksum.
+
+Mismatch:
+
+**abort before submit.**
+
+Do not guess around field-level changes.
+
+---
+
+## Submission-outcome rule
+
+Positive confirmation is required for `success`.
+
+Once submit intent is durably claimed and the submit action begins:
+
+- confirmed provider-specific success → `success`;
+- any timeout/navigation/network/ambiguous state without positive confirmation
+  → `unknown_outcome`.
+
+Do not blindly retry.
+
+Do not classify a post-click ambiguity as a safe pre-submit failure.
+
+---
+
+## Receipt safety
+
+Execution receipts may contain:
+
+- run id;
+- submission key;
+- sanitized target key/display;
+- plan id;
+- draft id;
+- consistency report id;
+- structural fingerprint;
+- provider id;
+- operator;
+- timestamps;
+- stable state/outcome codes;
+- policy/consistency counts/reason codes.
+
+Receipts must NOT persist:
+
+- raw answers;
+- profile values;
+- blocked sensitive values;
+- provider prompts;
+- browser page HTML;
+- cookies;
+- tokens;
+- URL userinfo/query secrets;
+- custom sensitive-rule regex bodies.
+
+---
+
+## Phase 5 must NOT implement
+
+Do not implement during Phase 5:
+
+- real cloud/local LLM inference;
+- LLM consistency pass;
+- automatic answer repair;
+- batch response generation;
+- batch submission workers;
+- scheduler/cron;
+- randomized/human-like pacing;
 - anti-detection/evasion;
-- real cloud-model calls;
-- real local-model inference;
-- automatic LLM consistency pass;
-- automatic answer rewrite;
-- automatic answer regeneration/retry;
+- CAPTCHA solving;
+- login automation;
+- persistent browser profiles/cookies;
+- file upload execution;
+- checkbox-grid support;
+- conditional-routing parser expansion;
+- rating/dropdown parser expansion merely for execution;
+- Microsoft Forms/provider #2;
+- Google Forms API/OAuth submission;
 - OpenClaw integration;
 - Telegram integration;
-- metrics phase;
-- deferred conditional-routing support;
-- deferred checkbox-grid detection;
-- upload execution;
-- new persistence/migrations.
+- Phase 7 metrics/export system;
+- Phase 6 work.
 
-Do not begin Phase 5 automatically.
+Do not begin Phase 6 automatically.
 
 ---
 
-## Expected Phase 4 verification style
+## Expected Phase 5 verification style
 
 Use targeted tests while implementing.
 
-Run the full regression only for final acceptance.
+Do not hit real Google Forms in automated tests.
 
-Expected final commands include:
+Acceptance browser tests must use a local execution harness and Chromium.
+
+The test harness must provide deterministic scenarios for at least:
+
+- normal confirmed success;
+- closed/not-accepting form;
+- fingerprint mutation before submit;
+- ambiguous post-submit outcome;
+- locator/fill failure.
+
+Tests should prove no external network is reached.
+
+Final acceptance should include:
 
 ```bash
-npm run verify:phase4
+npm run verify:phase5
 npm test
 npm run typecheck
 npm run build
@@ -875,32 +989,34 @@ git diff --stat
 git status --short
 ```
 
-Local smoke tests should exercise the Phase 4 check command against the accepted
-fixture and structured JSON output.
-
-A live/external Google Forms URL must remain rejected without network fetch.
-
-The exact acceptance contract belongs in `docs/PHASE_4.md`.
+The exact acceptance contract belongs in `docs/PHASE_5.md`.
 
 ---
 
-## Where Phase 4 should start
+## Where Phase 5 should start
 
 1. Read `AGENTS.md`.
 2. Read this handoff.
-3. Read `docs/PHASE_4.md`.
-4. Treat `19b312a` as the accepted implementation baseline.
-5. Confirm the Phase 4 spec is protected from agent edits.
-6. Do not broadly re-audit Phase 0/1/2/3.
-7. Inspect only Phase 3 domain/draft interfaces and earlier contracts directly
-   needed by Phase 4.
-8. Build the native TODO from P4 requirement IDs.
-9. Keep exactly one meaningful milestone in progress.
-10. Implement Phase 4 only.
-11. Use deterministic/local tests only.
-12. Use targeted tests during implementation.
-13. Run complete verification only for final acceptance.
-14. Produce a P4 requirement-by-requirement acceptance report.
-15. Do not commit.
-16. Stop.
-17. Do not begin Phase 5.
+3. Read `docs/PHASE_5.md`.
+4. Treat `0cda0ff` as the accepted implementation baseline.
+5. Confirm the Phase 5 spec is protected from worker edits.
+6. Do not broadly re-audit Phase 0/1/2/3/4.
+7. Inspect only interfaces Phase 5 directly consumes:
+   - domain schema/draft/consistency;
+   - draft orchestration;
+   - consistency gate;
+   - policy engine/auth/rate store;
+   - DB migration/repository conventions;
+   - CLI/exit handling;
+   - fixture infrastructure.
+8. Inspect current package/browser dependencies before adding Playwright.
+9. Build a native TODO from every P5 requirement id.
+10. Keep exactly one meaningful milestone in progress.
+11. Implement Phase 5 only.
+12. Use the local execution harness for browser tests.
+13. Use targeted tests during implementation.
+14. Run full verification only for final acceptance.
+15. Produce requirement-by-requirement acceptance evidence.
+16. Do not commit.
+17. Stop.
+18. Do not begin Phase 6.

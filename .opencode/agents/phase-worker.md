@@ -19,6 +19,7 @@ permission:
     "docs/PHASE_2.md": deny
     "docs/PHASE_3.md": deny
     "docs/PHASE_4.md": deny
+    "docs/PHASE_5.md": deny
     "docs/phase0.md": deny
     ".opencode/agents/*": deny
     "**/.env": deny
