@@ -24,6 +24,7 @@ import {
 } from './cli/index.ts';
 import { handleCmdAuth } from './cli/auth.ts';
 import { handleCmdDraft } from './cli/draft.ts';
+import { handleCmdCheck } from './cli/check.ts';
 
 export const VERSION = '0.1.0';
 
@@ -69,6 +70,8 @@ async function runArgv(argv: string[]): Promise<number> {
       return await handleCmdAuth(rest, ctx);
     case 'draft':
       return await handleCmdDraft(rest, ctx);
+    case 'check':
+      return await handleCmdCheck(rest, ctx);
     case 'file':
       return await handleCmdFile(rest[0] ?? '', ctx);
     case 'preview':
