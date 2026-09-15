@@ -101,6 +101,46 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_llm_calls_created ON llm_calls(created_at);
     `,
   },
+  {
+    id: 5,
+    name: 'authorizations',
+    up: `
+      -- Durable, auditable authorization records (Phase 2). Revocation flips
+      -- the status column to 'revoked' instead of deleting the row, preserving
+      -- history. The partial unique index enforces at most one ACTIVE record
+      -- per (target_key, scope) so repeated allows stay idempotent.
+      CREATE TABLE IF NOT EXISTS authorizations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target_key TEXT NOT NULL,
+        target_display TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        operator TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        revoked_at TEXT
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_authorizations_target ON authorizations(target_key, scope);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_authorizations_active_unique
+        ON authorizations(target_key, scope) WHERE status = 'active';
+    `,
+  },
+  {
+    id: 6,
+    name: 'rate_events',
+    up: `
+      -- Durable rate-policy event log (Phase 2). Counters are derived from
+      -- this log so caps and delays survive process restarts. No executor or
+      -- scheduler writes here; only deterministic rate gate decisions do.
+      CREATE TABLE IF NOT EXISTS rate_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target_key TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        at_ms INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_rate_events_target_kind ON rate_events(target_key, kind, at_ms);
+    `,
+  },
 ];
 
 export function migrationMap(): Map<number, Migration> {

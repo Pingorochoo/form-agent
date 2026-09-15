@@ -50,6 +50,35 @@ const formsSchema = z.object({
   allowlist: z.array(z.string()).default([]),
 });
 
+/**
+ * Safety-mode gating (P2-R15). Execution eligibility requires
+ * `safety.mode === 'test-only'`; every other mode (including the default)
+ * denies. The default is deliberately deny-by-default.
+ */
+export const SAFETY_MODES = ['test-only', 'disabled'] as const;
+export type SafetyMode = (typeof SAFETY_MODES)[number];
+
+const safetySchema = z.object({
+  mode: z.enum(SAFETY_MODES).default('disabled'),
+});
+
+/**
+ * Deterministic rate policy (P2-R16). Limits are safety gates, never pacing or
+ * anti-detection behavior. Only the defaults already defined by repository
+ * evidence are set here; the hourly/daily caps and batch pause stay optional so
+ * absence means "no configured cap" rather than an invented number.
+ *
+ * `jitterFactor` is configuration only in Phase 2 (validated, never applied).
+ */
+const rateSchema = z.object({
+  delayBetweenSubmissionsMs: z.number().int().min(0).default(30_000),
+  maxSubmissionsPerFormPerHour: z.number().int().min(0).optional(),
+  maxSubmissionsPerFormPerDay: z.number().int().min(0).optional(),
+  batchPauseSeconds: z.number().int().min(0).optional(),
+  maxConcurrentBatches: z.number().int().min(1).default(1),
+  jitterFactor: z.number().min(0).max(1).default(0),
+});
+
 const telegramSchema = z.object({
   enabled: z.boolean().default(false),
   chatId: z.string().optional(),
@@ -63,6 +92,8 @@ export const appConfigSchema = z
     analyze: analyzeSchema.default({}),
     run: runSchema.default({}),
     forms: formsSchema.default({}),
+    safety: safetySchema.default({}),
+    rate: rateSchema.default({}),
     telegram: telegramSchema.default({}),
   })
   .strict();

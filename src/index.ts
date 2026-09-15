@@ -22,6 +22,7 @@ import {
   handleCmdHelp,
   type CliContext,
 } from './cli/index.ts';
+import { handleCmdAuth } from './cli/auth.ts';
 
 export const VERSION = '0.1.0';
 
@@ -63,6 +64,8 @@ async function runArgv(argv: string[]): Promise<number> {
   switch (command) {
     case 'analyze':
       return await handleCmdAnalyze(rest[0] ?? '', ctx);
+    case 'auth':
+      return await handleCmdAuth(rest, ctx);
     case 'file':
       return await handleCmdFile(rest[0] ?? '', ctx);
     case 'preview':

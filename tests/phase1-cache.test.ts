@@ -30,8 +30,11 @@ function makeStore(): { db: FormAgentDatabase; store: AnalysisStore } {
 }
 
 describe('cache / persistence', () => {
-  it('reuses the existing migration catalog (no new migration added)', () => {
-    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4]);
+  it('preserves accepted migrations 1-4 and appends the Phase 2 migrations', () => {
+    // Migrations 1-4 are the accepted Phase 0/1 catalog and must never be
+    // edited. Phase 2 appends authorizations (5) and rate_events (6).
+    expect(MIGRATIONS.slice(0, 4).map((m) => m.id)).toEqual([1, 2, 3, 4]);
+    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('persists the schema into form_schema + analysis_cache keyed by fingerprint', () => {

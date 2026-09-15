@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:phase1": "vitest run tests/phase1-parser.test.ts tests/phase1-fixture.test.ts tests/phase1-golden.test.ts tests/phase1-cache.test.ts tests/phase1-cli.test.ts tests/phase1-no-submit.test.ts",
+    "verify:phase2": "vitest run tests/phase2-target.test.ts tests/phase2-auth.test.ts tests/phase2-sensitive.test.ts tests/phase2-policy.test.ts tests/phase2-rate.test.ts tests/phase2-cli.test.ts tests/phase2-no-submit.test.ts",
     "fixture:sanitize": "node scripts/sanitize-observed-form.mjs",
     "fixture:decode": "node scripts/decode-observed-form.mjs"
   },

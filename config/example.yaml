@@ -62,5 +62,24 @@ forms:
   allowlist:
     - "https://fixtures.local/forms/*"
 
+safety:
+  # Phase 2 safety-mode gate. Execution eligibility requires test-only;
+  # every other value (including the disabled default) denies.
+  mode: disabled
+
+rate:
+  # Phase 2 deterministic rate limits (safety gates, not anti-detection).
+  # Hourly/daily caps and batch pause are optional (absent = no configured cap).
+  delayBetweenSubmissionsMs: 30000
+  # maxSubmissionsPerFormPerHour: 20
+  # maxSubmissionsPerFormPerDay: 200
+  # batchPauseSeconds: 60
+  maxConcurrentBatches: 1
+  jitterFactor: 0
+
+# User-configurable sensitive-field rules live in config/policies.d/*.{json,yaml}
+# (data-only files), e.g.:
+#   {"rules": [{"id": "dept-code", "pattern": "department code", "category": "employee-id", "mode": "specific-authorization"}]}
+
 telegram:
   enabled: false

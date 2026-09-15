@@ -17,6 +17,8 @@ import { analyzeForm, formatAnalysisSummary } from '../analyze/analyze.ts';
 import { AnalyzeInputError, resolveAnalyzeInput, type ResolvedAnalyzeInput } from '../analyze/resolve-input.ts';
 import { GoogleFormsParseError } from '../parser/google-forms.ts';
 import { ExitCodes } from './exit-codes.ts';
+import { buildPolicyEngine, formatRunPolicySummary } from '../policy/policyEngine.ts';
+import { loadSensitiveRules, resolveSensitiveRules, PolicyConfigError } from '../policy/policy-config.ts';
 
 export class NotImplementedError extends Error {
   constructor(command: string) {
@@ -82,11 +84,23 @@ export async function handleCmdAnalyze(
     const store = new AnalysisStore(database);
     const outcome = analyzeForm({ html: input.html, url: input.url }, store);
     process.stdout.write(`${formatAnalysisSummary(outcome.schema, outcome.fingerprintId)}\n`);
+
+    // Phase 2 policy visibility (P2-R18): report authorization state,
+    // sensitive-field counts, and execution eligibility. Analysis is
+    // inspection only and never implies execution authorization.
+    const { rules } = loadSensitiveRules();
+    const engine = buildPolicyEngine(ctx.config, database, resolveSensitiveRules(rules));
+    const decision = engine.evaluateRunPolicy({ target: input.url, scope: 'run', schema: outcome.schema });
+    process.stdout.write(`${formatRunPolicySummary(decision)}\n`);
     return ExitCodes.SUCCESS;
   } catch (err) {
     if (err instanceof GoogleFormsParseError) {
       ctx.logger.error(`Failed to parse form: ${err.message}`);
       return ExitCodes.VALIDATION;
+    }
+    if (err instanceof PolicyConfigError) {
+      ctx.logger.error(err.message);
+      return ExitCodes.USAGE;
     }
     throw err;
   } finally {
@@ -178,6 +192,11 @@ export function handleCmdHelp(): number {
       '',
       'Usage:',
       '  form-agent analyze <url>            Analyze a form (Phase 1)',
+      '  form-agent auth allow <target> --scope run --by <operator>',
+      '                                      Allowlist a target for a future run',
+      '  form-agent auth check <target>      Check authorization state',
+      '  form-agent auth list               List authorization records',
+      '  form-agent auth revoke <target>     Revoke an authorization',
       '  form-agent file <path>              File an update (scaffold)',
       '  form-agent preview                  Preview answers before run (not implemented)',
       '  form-agent plan <url>               Plan a batch (not implemented)',
