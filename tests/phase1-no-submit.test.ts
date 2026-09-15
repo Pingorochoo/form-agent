@@ -12,7 +12,6 @@ import { describe, expect, it } from 'vitest';
 import {
   handleCmdPlan,
   handleCmdPreview,
-  handleCmdRun,
   NotImplementedError,
 } from '../src/cli/index.ts';
 import { ExitCodes } from '../src/cli/exit-codes.ts';
@@ -53,11 +52,10 @@ const FORBIDDEN = [
 ];
 
 describe('P1-R18 — no form submission capability', () => {
-  it('keeps preview / plan / run not-implemented', async () => {
+  it('keeps preview / plan not-implemented', async () => {
     const ctx = makeCtx();
     await expect(handleCmdPreview(ctx)).rejects.toThrow(NotImplementedError);
     await expect(handleCmdPlan('https://fixtures.local/forms/observed-responder', ctx)).rejects.toThrow(NotImplementedError);
-    await expect(handleCmdRun(ctx)).rejects.toThrow(NotImplementedError);
   });
 
   it('maps a not-implemented command to exit code 2 through the CLI', async () => {

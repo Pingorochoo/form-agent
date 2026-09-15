@@ -13,7 +13,6 @@ import { describe, expect, it } from 'vitest';
 import {
   handleCmdPlan,
   handleCmdPreview,
-  handleCmdRun,
   NotImplementedError,
 } from '../src/cli/index.ts';
 import { defaultConfig } from '../src/config/schema.ts';
@@ -82,11 +81,10 @@ describe('P2-R20 — no execution or future-phase scope creep', () => {
     expect(source).not.toContain('Math.random');
   });
 
-  it('preview / plan / run remain not-implemented after Phase 2', async () => {
+  it('preview / plan remain not-implemented after Phase 2', async () => {
     const ctx = makeCtx();
     await expect(handleCmdPreview(ctx)).rejects.toThrow(NotImplementedError);
     await expect(handleCmdPlan('https://fixtures.local/forms/demo', ctx)).rejects.toThrow(NotImplementedError);
-    await expect(handleCmdRun(ctx)).rejects.toThrow(NotImplementedError);
   });
 });
 

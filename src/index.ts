@@ -18,13 +18,13 @@ import {
   handleCmdPreview,
   handleCmdProviderValidate,
   handleCmdProviderWhere,
-  handleCmdRun,
   handleCmdHelp,
   type CliContext,
 } from './cli/index.ts';
 import { handleCmdAuth } from './cli/auth.ts';
 import { handleCmdDraft } from './cli/draft.ts';
 import { handleCmdCheck } from './cli/check.ts';
+import { handleCmdRun } from './cli/run.ts';
 
 export const VERSION = '0.1.0';
 
@@ -79,7 +79,7 @@ async function runArgv(argv: string[]): Promise<number> {
     case 'plan':
       return await handleCmdPlan(rest[0] ?? '', ctx);
     case 'run':
-      return await handleCmdRun(ctx);
+      return await handleCmdRun(rest, ctx);
     case 'metrics':
       return await handleCmdMetrics(ctx);
     case 'provider': {

@@ -3,5 +3,6 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
-  "remoteUser": "node"
+  "remoteUser": "node",
+  "postCreateCommand": "npm ci && npx playwright install chromium"
 }

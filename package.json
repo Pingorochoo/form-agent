@@ -21,12 +21,15 @@
     "verify:phase2": "vitest run tests/phase2-target.test.ts tests/phase2-auth.test.ts tests/phase2-sensitive.test.ts tests/phase2-policy.test.ts tests/phase2-rate.test.ts tests/phase2-cli.test.ts tests/phase2-no-submit.test.ts",
     "verify:phase3": "vitest run tests/phase3-semantics.test.ts tests/phase3-profile.test.ts tests/phase3-draft.test.ts tests/phase3-answer-validation.test.ts tests/phase3-sensitive.test.ts tests/phase3-cli.test.ts tests/phase3-no-execution.test.ts",
     "verify:phase4": "vitest run tests/phase4-consistency.test.ts tests/phase4-integrity.test.ts tests/phase4-profile.test.ts tests/phase4-relationships.test.ts tests/phase4-cli.test.ts tests/phase4-no-execution.test.ts",
+    "verify:phase5": "vitest run tests/phase5-plan.test.ts tests/phase5-receipt.test.ts tests/phase5-policy-gates.test.ts tests/phase5-cli.test.ts tests/phase5-no-evasion.test.ts tests/phase5-browser-e2e.test.ts tests/phase5-smoke.test.ts tests/phase5-review.test.ts",
     "fixture:sanitize": "node scripts/sanitize-observed-form.mjs",
-    "fixture:decode": "node scripts/decode-observed-form.mjs"
+    "fixture:decode": "node scripts/decode-observed-form.mjs",
+    "setup:browser": "playwright install chromium"
   },
   "dependencies": {
     "better-sqlite3": "^12.2.0",
     "commander": "^13.1.0",
+    "playwright": "^1.63.0",
     "yaml": "^2.7.0",
     "zod": "^3.25.76"
   },

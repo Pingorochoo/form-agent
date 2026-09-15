@@ -84,6 +84,21 @@ const telegramSchema = z.object({
   chatId: z.string().optional(),
 });
 
+/**
+ * Phase 5 browser-execution configuration (P5-R19).
+ *
+ * Conservative finite defaults: headless by default (no display needed), and
+ * explicit finite navigation/action timeouts. `executablePath` is only for
+ * environments that must point Playwright at a specific Chromium build; the
+ * default empty string means "use Playwright's bundled Chromium".
+ */
+const browserSchema = z.object({
+  headless: z.boolean().default(true),
+  navigationTimeoutMs: z.number().int().positive().default(30_000),
+  actionTimeoutMs: z.number().int().positive().default(10_000),
+  executablePath: z.string().default(''),
+});
+
 export const appConfigSchema = z
   .object({
     database: databaseSchema.default({}),
@@ -94,6 +109,7 @@ export const appConfigSchema = z
     forms: formsSchema.default({}),
     safety: safetySchema.default({}),
     rate: rateSchema.default({}),
+    browser: browserSchema.default({}),
     telegram: telegramSchema.default({}),
   })
   .strict();

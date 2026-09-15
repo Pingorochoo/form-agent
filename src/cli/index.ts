@@ -131,13 +131,6 @@ export async function handleCmdPlan(
   notImplemented('plan');
 }
 
-export async function handleCmdRun(
-  ctx: CliContext,
-): Promise<number> {
-  void ctx;
-  notImplemented('run');
-}
-
 export async function handleCmdProviderValidate(
   providerId: string,
   ctx: CliContext,
@@ -204,7 +197,10 @@ export function handleCmdHelp(): number {
       '  form-agent file <path>              File an update (scaffold)',
       '  form-agent preview                  Preview answers before run (not implemented)',
       '  form-agent plan <url>               Plan a batch (not implemented)',
-      '  form-agent run                       Run an approved batch (not implemented)',
+      '  form-agent run <target> --seed <seed> [--json]',
+      '                                      Preflight a run (plan only, no fill/submit)',
+      '  form-agent run <target> --seed <seed> --submit --expect-plan <planId> --by <operator>',
+      '                                      Submit an approved plan (explicit approval)',
       '  form-agent provider <id> --validate  Check an LLM provider',
       '  form-agent provider where           List configured providers',
       '  form-agent metrics                  Show run metrics (not implemented)',

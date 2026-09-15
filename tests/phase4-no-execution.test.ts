@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { handleCmdPlan, handleCmdPreview, handleCmdRun, NotImplementedError } from '../src/cli/index.ts';
+import { handleCmdPlan, handleCmdPreview, NotImplementedError } from '../src/cli/index.ts';
 import { defaultConfig } from '../src/config/schema.ts';
 import { createLogger } from '../src/logging/logger.ts';
 import type { CliContext } from '../src/cli/index.ts';
@@ -76,17 +76,17 @@ describe('P4-R18/R19 — no execution or out-of-scope behavior', () => {
     }
   });
 
-  it('preview / plan / run remain not-implemented after Phase 4', async () => {
+  it('preview / plan remain not-implemented after Phase 4', async () => {
     const ctx = makeCtx();
     await expect(handleCmdPreview(ctx)).rejects.toThrow(NotImplementedError);
     await expect(handleCmdPlan('https://fixtures.local/forms/demo', ctx)).rejects.toThrow(NotImplementedError);
-    await expect(handleCmdRun(ctx)).rejects.toThrow(NotImplementedError);
   });
 });
 
 describe('P4-R17 — no persistence or migration', () => {
-  it('accepted migrations remain exactly 1-6 with no consistency/preview/approval tables', () => {
-    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6]);
+  it('preserves migrations 1-6 and appends only migration 7 (execution receipt)', () => {
+    expect(MIGRATIONS.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(MIGRATIONS.slice(0, 6).map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6]);
     const up = MIGRATIONS.map((m) => m.up).join('\n').toLowerCase();
     expect(up).not.toContain('create table if not exists consistency');
     expect(up).not.toContain('create table if not exists preview');

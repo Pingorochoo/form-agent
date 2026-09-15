@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { handleCmdPlan, handleCmdPreview, handleCmdRun, NotImplementedError } from '../src/cli/index.ts';
+import { handleCmdPlan, handleCmdPreview, NotImplementedError } from '../src/cli/index.ts';
 import { defaultConfig } from '../src/config/schema.ts';
 import { createLogger } from '../src/logging/logger.ts';
 import type { CliContext } from '../src/cli/index.ts';
@@ -68,11 +68,10 @@ describe('P3-R19 — no execution or out-of-scope behavior', () => {
     }
   });
 
-  it('preview / plan / run remain not-implemented after Phase 3', async () => {
+  it('preview / plan remain not-implemented after Phase 3', async () => {
     const ctx = makeCtx();
     await expect(handleCmdPreview(ctx)).rejects.toThrow(NotImplementedError);
     await expect(handleCmdPlan('https://fixtures.local/forms/demo', ctx)).rejects.toThrow(NotImplementedError);
-    await expect(handleCmdRun(ctx)).rejects.toThrow(NotImplementedError);
   });
 });
 

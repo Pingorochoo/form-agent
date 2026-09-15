@@ -141,6 +141,46 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_rate_events_target_kind ON rate_events(target_key, kind, at_ms);
     `,
   },
+  {
+    id: 7,
+    name: 'execution_receipts',
+    up: `
+      -- Durable execution receipt / crash-safe submission claim (Phase 5).
+      --
+      -- Never stores answer values, profile values, blocked sensitive values,
+      -- page HTML, cookies/storage, tokens, raw exceptions, URL query/userinfo,
+      -- or sensitive-policy regex bodies. Only sanitized provenance + stable
+      -- state/outcome codes.
+      --
+      -- The partial unique index enforces AT MOST ONE claimed
+      -- (submit_attempted = 1) receipt per submission_key, which is the
+      -- duplicate-submit prevention invariant. A crash after claim leaves a
+      -- durable 'submitting' row that blocks automatic resubmit after reopen.
+      CREATE TABLE IF NOT EXISTS execution_receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        submission_key TEXT NOT NULL,
+        target_key TEXT NOT NULL,
+        target_display TEXT NOT NULL,
+        plan_id TEXT NOT NULL,
+        draft_id TEXT NOT NULL,
+        consistency_report_id TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        provider_id TEXT NOT NULL,
+        provider_version TEXT NOT NULL,
+        operator TEXT,
+        approval_at TEXT,
+        state TEXT NOT NULL,
+        submit_attempted INTEGER NOT NULL DEFAULT 0,
+        outcome TEXT,
+        outcome_code TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_execution_receipts_key ON execution_receipts(submission_key);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_receipts_claimed
+        ON execution_receipts(submission_key) WHERE submit_attempted = 1;
+    `,
+  },
 ];
 
 export function migrationMap(): Map<number, Migration> {
