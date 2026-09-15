@@ -33,15 +33,31 @@ export interface LatentTrait {
   rationale: string;
 }
 
+/**
+ * A single synthetic fact (Phase 3, P3-R5). Provider-neutral, form-dependent
+ * synthetic state: facts, preferences, experiences and constraints are all
+ * representable as named facts without inventing real-PII categories.
+ */
+export interface SyntheticFact {
+  key: string;
+  value: string | number | boolean;
+  /** Why this fact was established (tied to semantic context). */
+  rationale: string;
+}
+
 export interface SyntheticProfile {
   version: typeof PROFILE_MODEL_VERSION;
   profileId: string;
   formId: string;
   /** The semantic model snapshot used to derive this profile. */
   semanticModelId: string;
+  /** Explicit synthetic-provenance marker (Phase 3, P3-R12). */
+  synthetic: true;
   identity: ProfileIdentity;
   /** Form-specific latent traits (refinement #4). */
   latentTraits: LatentTrait[];
+  /** Form-dependent synthetic facts/preferences/experiences/constraints (P3-R5). */
+  facts: SyntheticFact[];
   /** How distinct/central this persona is; drives variation. */
   archetype: 'composite' | 'adversarial' | 'edge-case';
   metadata?: Record<string, unknown>;

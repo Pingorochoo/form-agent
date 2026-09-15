@@ -109,6 +109,19 @@ export interface SemanticRelationship {
   note?: string;
 }
 
+/**
+ * Section-level meaning (Phase 3, P3-R3). The whole-form semantic model must
+ * be able to describe what each section/page of the form is for, not just the
+ * form as a whole and its individual questions.
+ */
+export interface SectionSemantics {
+  sectionId: string;
+  /** What the section is about / its role in the form. */
+  meaning: SemanticAttribute<string>;
+  rationale: string;
+  confidence: Confidence;
+}
+
 export interface SemanticModel {
   version: typeof SEMANTIC_MODEL_VERSION;
   /** What the form as a whole is about. */
@@ -121,6 +134,8 @@ export interface SemanticModel {
   targetAudience: TargetAudience;
   /** Per-question semantics (refinement #2: one model per form). */
   questions: Record<string, QuestionSemantics>;
+  /** Per-section semantics keyed by section id (Phase 3, P3-R3). */
+  sections?: Record<string, SectionSemantics>;
   /** Structured question semantic tags available for option reasoning. */
   structuredQuestionTags: Record<string, string>;
   /** Overall confidence in the semantic model. */

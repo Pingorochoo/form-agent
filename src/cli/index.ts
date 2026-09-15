@@ -197,6 +197,8 @@ export function handleCmdHelp(): number {
       '  form-agent auth check <target>      Check authorization state',
       '  form-agent auth list               List authorization records',
       '  form-agent auth revoke <target>     Revoke an authorization',
+      '  form-agent draft <input> --seed <seed> [--json]',
+      '                                      Generate a local synthetic draft (Phase 3)',
       '  form-agent file <path>              File an update (scaffold)',
       '  form-agent preview                  Preview answers before run (not implemented)',
       '  form-agent plan <url>               Plan a batch (not implemented)',
