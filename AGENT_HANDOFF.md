@@ -1,4 +1,4 @@
-# AGENT_HANDOFF — Phase 8 Runtime Verification
+# AGENT_HANDOFF — Phase 8 Accepted
 
 ## Repository
 
@@ -66,9 +66,9 @@ the Phase 8 implementation checkpoint.
 
 ## Current Phase 8 status
 
-Phase 8 implementation is substantially complete.
+Phase 8 implementation is complete.
 
-Phase 8 is **NOT YET ACCEPTED**.
+Phase 8 is **ACCEPTED**.
 
 Independent review status:
 
@@ -78,7 +78,7 @@ Finding Q                                  FIXED
 Finding S                                  FIXED
 Finding J residual hard-bound behavior    FIXED
 Adapter launcher executable/direct spawn  FIXED
-Finding R real OpenClaw runtime proof      BLOCKED
+Finding R real OpenClaw runtime proof      FIXED
 ```
 
 Do not broadly redesign or rewrite Phase 8.
@@ -89,36 +89,16 @@ Only reopen implementation when new concrete evidence requires it.
 
 ---
 
-## Remaining blocker — Finding R
+## Finding R — FIXED
 
-Finding R requires proof against the real OpenClaw runtime:
+Real runtime verification against OpenClaw `2026.9.4` succeeded.
 
-```text
-OpenClaw 2026.9.4
-```
+The plugin loaded and imported successfully, registered `form_agent` and
+`form_agent_submit`, registered the `before_tool_call` typed hook, resolved
+`typebox` normally, reported no missing required dependencies, and produced no
+runtime diagnostics.
 
-Static packaging tests, synthetic OpenClaw packages, TypeBox stubs, or a plain
-Node import are NOT substitutes for the required runtime proof.
-
-Required evidence:
-
-1. `openclaw --version` reports exactly `2026.9.4`.
-2. Verification uses isolated OpenClaw state/configuration.
-3. Production `~/.openclaw`, running gateways, real Telegram credentials, and
-   real form submissions are not touched.
-4. The real plugin is installed/linked using the supported OpenClaw mechanism.
-5. Real runtime inspection imports/loads the plugin successfully.
-6. Registered model tools include:
-   - `form_agent`
-   - `form_agent_submit`
-7. The expected `before_tool_call` approval hook is present.
-8. Runtime dependencies, including `typebox`, resolve normally without
-   synthetic substitutes.
-
-If OpenClaw `2026.9.4` is unavailable, Finding R remains `BLOCKED`.
-
-If the real runtime exposes a concrete implementation defect, make the smallest
-Finding-R-specific correction and rerun the verification.
+See `docs/PHASE_8_ACCEPTANCE.md` for the durable acceptance evidence.
 
 ---
 
@@ -174,41 +154,21 @@ The launcher is committed executable:
 
 ## Phase 8 acceptance verification
 
-After Finding R succeeds, run:
+The final Phase 8 acceptance gates passed on 2026-09-17.
 
-```bash
-npm run verify:phase8
-npm test
-npm run typecheck
-npm run build
-git diff --check
-```
-
-Also confirm:
-
-- P/Q/S remain fixed;
-- J remains fixed;
-- launcher/direct-spawn behavior remains fixed;
-- no unrelated dependency churn;
-- no credential leakage;
-- no real Telegram/form-submission side effects.
-
-A successful implementation report is not itself acceptance evidence.
+See `docs/PHASE_8_ACCEPTANCE.md` for the exact runtime and regression evidence.
 
 ---
 
 ## Exact next action
 
-Do NOT start Phase 9.
+Phase 8 is accepted.
 
-Next action:
+Next:
 
-1. perform isolated real OpenClaw `2026.9.4` Finding R verification;
-2. if Finding R passes, run the complete Phase 8 acceptance regression set;
-3. if every acceptance gate is green, mark Phase 8 accepted;
-4. integrate the accepted Phase 8 state into `main`;
-5. optionally create an annotated `phase-8-accepted` tag;
-6. update this handoff for Phase 9.
+1. integrate `phase/8` into `main`;
+2. optionally create the annotated tag `phase-8-accepted`;
+3. do not start Phase 9 until explicitly requested.
 
 ---
 
