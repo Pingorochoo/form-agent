@@ -1,0 +1,49 @@
+{
+  "id": "form-agent-openclaw",
+  "name": "Form Agent",
+  "description": "Bounded OpenClaw + Telegram orchestration of the accepted Form Agent CLI. Submission requires host-mediated operator approval.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["accountId", "operatorSenderId", "adapterBinaryPath", "adapterConfigPath"],
+    "properties": {
+      "accountId": {
+        "type": "string",
+        "description": "Dedicated (non-default) Telegram account id from deployment config."
+      },
+      "operatorSenderId": {
+        "type": "string",
+        "description": "The single frozen numeric Telegram operator id."
+      },
+      "adapterBinaryPath": {
+        "type": "string",
+        "description": "Absolute path to the form-agent-openclaw adapter binary."
+      },
+      "adapterConfigPath": {
+        "type": "string",
+        "description": "Absolute path to the data-only adapter deployment config."
+      },
+      "allowedDraftProviders": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Local draft-provider allowlist (subset of reference, openai-compatible)."
+      },
+      "providerEnvNames": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Exact credential env-var NAMES forwarded to the Form Agent child."
+      }
+    }
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": ["form_agent", "form_agent_submit"]
+  },
+  "toolMetadata": {
+    "form_agent": { "optional": true },
+    "form_agent_submit": { "optional": true }
+  }
+}

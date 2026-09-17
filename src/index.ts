@@ -63,8 +63,13 @@ async function runArgv(argv: string[]): Promise<number> {
 
   const [command, ...rest] = argv;
   switch (command) {
-    case 'analyze':
-      return await handleCmdAnalyze(rest[0] ?? '', ctx);
+    case 'analyze': {
+      // Additive `analyze --json`: the flag is filtered anywhere in argv and
+      // never becomes the positional target. Absent-flag behavior is unchanged.
+      const json = rest.includes('--json');
+      const positional = rest.filter((arg) => arg !== '--json');
+      return await handleCmdAnalyze(positional[0] ?? '', ctx, json);
+    }
     case 'auth':
       return await handleCmdAuth(rest, ctx);
     case 'draft':

@@ -13,7 +13,7 @@ import { FakeProvider } from '../llm/fake.ts';
 import type { Logger } from '../logging/logger.ts';
 import { FormAgentDatabase } from '../db/database.ts';
 import { AnalysisStore } from '../analyze/store.ts';
-import { analyzeForm, formatAnalysisSummary } from '../analyze/analyze.ts';
+import { analyzeForm, countByKind, formatAnalysisSummary } from '../analyze/analyze.ts';
 import { AnalyzeInputError, resolveAnalyzeInput, type ResolvedAnalyzeInput } from '../analyze/resolve-input.ts';
 import { GoogleFormsParseError } from '../parser/google-forms.ts';
 import { ExitCodes } from './exit-codes.ts';
@@ -69,9 +69,43 @@ export function createClientForProvider(
   return new FakeProvider(`fake-${providerId}`);
 }
 
+/**
+ * Build the additive `analyze --json` machine document (P8-R8, §8.2). The
+ * default/human output path is untouched; this function is only reached when
+ * `--json` is present, in which case it is the SINGLE stdout document.
+ */
+export function analyzeToJson(
+  schema: import('../domain/types.ts').FormSchema,
+  fingerprintId: string,
+  policy: { allowed: boolean; reasons: string[] },
+): Record<string, unknown> {
+  const requiredCount = schema.parts.filter((question) => question.required === 'required').length;
+  return {
+    command: 'analyze',
+    form: { id: schema.formId, title: schema.title },
+    fingerprint: fingerprintId,
+    sections: schema.sections.map((section) => ({
+      index: section.index,
+      title: section.title,
+      questionCount: section.questionIds.length,
+    })),
+    questions: {
+      total: schema.parts.length,
+      required: requiredCount,
+      optional: schema.parts.length - requiredCount,
+    },
+    kinds: countByKind(schema),
+    routing: schema.hasRouting ? 'conditional' : 'sequential',
+    answerModel: schema.answerModel,
+    terminalSectionIds: [...schema.terminalSectionIds],
+    policy: { scope: 'run', allowed: policy.allowed, reasons: [...policy.reasons] },
+  };
+}
+
 export async function handleCmdAnalyze(
   urlOrFixture: string,
   ctx: CliContext,
+  json = false,
 ): Promise<number> {
   let input: ResolvedAnalyzeInput;
   try {
@@ -99,7 +133,6 @@ export async function handleCmdAnalyze(
   try {
     const store = new AnalysisStore(database);
     const outcome = analyzeForm({ html: input.html, url: input.url }, store);
-    process.stdout.write(`${formatAnalysisSummary(outcome.schema, outcome.fingerprintId)}\n`);
 
     // Phase 2 policy visibility (P2-R18): report authorization state,
     // sensitive-field counts, and execution eligibility. Analysis is
@@ -107,6 +140,16 @@ export async function handleCmdAnalyze(
     const { rules } = loadSensitiveRules();
     const engine = buildPolicyEngine(ctx.config, database, resolveSensitiveRules(rules));
     const decision = engine.evaluateRunPolicy({ target: input.url, scope: 'run', schema: outcome.schema });
+
+    if (json) {
+      // Exactly one machine-readable document; the human summary is suppressed.
+      process.stdout.write(
+        `${JSON.stringify(analyzeToJson(outcome.schema, outcome.fingerprintId, decision), null, 2)}\n`,
+      );
+      return ExitCodes.SUCCESS;
+    }
+
+    process.stdout.write(`${formatAnalysisSummary(outcome.schema, outcome.fingerprintId)}\n`);
     process.stdout.write(`${formatRunPolicySummary(decision)}\n`);
     return ExitCodes.SUCCESS;
   } catch (err) {

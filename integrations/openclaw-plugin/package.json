@@ -1,0 +1,33 @@
+{
+  "name": "@form-agent/openclaw-form-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenClaw plugin: bounded Form Agent orchestration with host-mediated submit approval.",
+  "files": [
+    "index.ts",
+    "approval-hook.ts",
+    "pending-client.ts",
+    "principal.ts",
+    "model-visible.ts",
+    "recovery-latch.ts",
+    "recovery-identity.ts",
+    "submit-handoff.ts",
+    "compat.ts",
+    "openclaw.plugin.json",
+    "skills"
+  ],
+  "dependencies": {
+    "typebox": "^1.1.38"
+  },
+  "peerDependencies": {
+    "openclaw": "2026.9.4"
+  },
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "compat": {
+      "pluginApi": "2026.9.4",
+      "minGatewayVersion": "2026.9.4"
+    }
+  }
+}

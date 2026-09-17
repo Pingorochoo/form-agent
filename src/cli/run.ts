@@ -42,10 +42,21 @@ interface RunArgs {
   target: string | undefined;
   seed: string | undefined;
   json: boolean;
+  /** Additive: emit one safe machine error document on controlled failure. */
+  jsonError: boolean;
   submit: boolean;
   expectPlan: string | undefined;
   by: string | undefined;
   draftProvider: DraftProviderKind | undefined;
+}
+
+type RunErrorKind = 'block' | 'usage' | 'error';
+
+/** Frozen controlled-failure kinds for the additive `run --json-error` document. */
+export function runErrorKindForExit(exitCode: number): RunErrorKind {
+  if (exitCode === ExitCodes.USAGE) return 'usage';
+  if (exitCode === ExitCodes.VALIDATION) return 'block';
+  return 'error';
 }
 
 type ParsedRunArgs = { ok: true; value: RunArgs } | { ok: false; error: string };
@@ -54,6 +65,7 @@ function parseRunArgs(args: string[]): ParsedRunArgs {
   let target: string | undefined;
   let seed: string | undefined;
   let json = false;
+  let jsonError = false;
   let submit = false;
   let expectPlan: string | undefined;
   let by: string | undefined;
@@ -64,6 +76,8 @@ function parseRunArgs(args: string[]): ParsedRunArgs {
     const arg = args[i] as string;
     if (arg === '--json') {
       json = true;
+    } else if (arg === '--json-error') {
+      jsonError = true;
     } else if (arg === '--submit') {
       submit = true;
     } else if (arg === '--seed' || arg === '--expect-plan' || arg === '--by' || arg === '--draft-provider') {
@@ -106,7 +120,7 @@ function parseRunArgs(args: string[]): ParsedRunArgs {
     }
   }
 
-  return { ok: true, value: { target, seed, json, submit, expectPlan, by, draftProvider } };
+  return { ok: true, value: { target, seed, json, jsonError, submit, expectPlan, by, draftProvider } };
 }
 
 function validateArgs(args: RunArgs): string | null {
@@ -136,16 +150,31 @@ function validateArgs(args: RunArgs): string | null {
 }
 
 export async function handleCmdRun(args: string[], ctx: CliContext): Promise<number> {
+  // Additive `--json-error` (P8-R8). It never changes which failures occur or
+  // the frozen exit codes; it only adds ONE safe machine error document on
+  // stdout for a controlled failure after argument parsing. Absent-flag
+  // behavior is byte-identical to the accepted contract.
+  const jsonError = args.includes('--json-error');
+  const mode: 'preflight' | 'submit' = args.includes('--submit') ? 'submit' : 'preflight';
+  const fail = (code: string, kind: RunErrorKind, exitCode: number): number => {
+    if (jsonError) {
+      process.stdout.write(`${JSON.stringify({ command: 'run', mode, ok: false, error: { code, kind } })}\n`);
+    }
+    return exitCode;
+  };
+  const failForExit = (code: string, exitCode: number): number =>
+    fail(code, runErrorKindForExit(exitCode), exitCode);
+
   const parsed = parseRunArgs(args);
   if (!parsed.ok) {
     ctx.logger.error(parsed.error);
-    return ExitCodes.USAGE;
+    return fail('USAGE_INVALID_ARGUMENTS', 'usage', ExitCodes.USAGE);
   }
   const value = parsed.value;
   const validationError = validateArgs(value);
   if (validationError !== null) {
     ctx.logger.error(validationError);
-    return ExitCodes.USAGE;
+    return fail('USAGE_INVALID_ARGUMENTS', 'usage', ExitCodes.USAGE);
   }
 
   let canonical;
@@ -153,7 +182,7 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
     canonical = canonicalizeTarget(value.target as string);
   } catch (err) {
     ctx.logger.error(err instanceof TargetError ? err.message : String(err));
-    return ExitCodes.USAGE;
+    return fail('USAGE_INVALID_TARGET', 'usage', ExitCodes.USAGE);
   }
 
   let sensitiveRules;
@@ -162,7 +191,7 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
   } catch (err) {
     if (err instanceof PolicyConfigError) {
       ctx.logger.error(err.message);
-      return ExitCodes.USAGE;
+      return fail('USAGE_POLICY_CONFIG', 'usage', ExitCodes.USAGE);
     }
     throw err;
   }
@@ -192,7 +221,7 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
     } catch (err) {
       if (err instanceof ExecutionUsageError) {
         ctx.logger.error(err.message);
-        return ExitCodes.USAGE;
+        return fail(err.code, 'usage', ExitCodes.USAGE);
       }
       throw err;
     }
@@ -211,7 +240,7 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
       } catch (err) {
         if (err instanceof LlmProviderError) {
           ctx.logger.error(err.message);
-          return llmExitCode(err.code);
+          return fail(err.code, 'error', llmExitCode(err.code));
         }
         throw err;
       }
@@ -234,7 +263,7 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
     const auth = orchestrator.checkAuthorization();
     if (!auth.allowed) {
       ctx.logger.error(`run not authorized for target (${auth.reasons.join(', ') || 'not-allowlisted'})`);
-      return ExitCodes.VALIDATION;
+      return fail('EXECUTION_NOT_AUTHORIZED', 'block', ExitCodes.VALIDATION);
     }
 
     if (value.submit) {
@@ -298,7 +327,7 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
   } catch (err) {
     if (err instanceof LlmProviderError) {
       ctx.logger.error(err.message);
-      return llmExitCode(err.code);
+      return fail(err.code, 'error', llmExitCode(err.code));
     }
     if (err instanceof ExecutionError) {
       if (err.retryAfterMs !== null) {
@@ -306,11 +335,15 @@ export async function handleCmdRun(args: string[], ctx: CliContext): Promise<num
       } else {
         ctx.logger.error(err.message);
       }
-      return executionExitCode(err.code);
+      return failForExit(err.code, executionExitCode(err.code));
     }
-    if (err instanceof DraftError || err instanceof ConsistencyError) {
+    if (err instanceof ConsistencyError) {
       ctx.logger.error(err.message);
-      return ExitCodes.VALIDATION;
+      return fail('CONSISTENCY_BLOCKED', 'block', ExitCodes.VALIDATION);
+    }
+    if (err instanceof DraftError) {
+      ctx.logger.error(err.message);
+      return fail('DRAFT_ERROR', 'block', ExitCodes.VALIDATION);
     }
     throw err;
   } finally {
