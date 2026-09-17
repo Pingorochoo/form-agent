@@ -162,13 +162,13 @@ See `docs/PHASE_8_ACCEPTANCE.md` for the exact runtime and regression evidence.
 
 ## Exact next action
 
-Phase 8 is accepted.
+Phase 8 is accepted and integrated into `main`.
 
-Next:
+Acceptance tag:
 
-1. integrate `phase/8` into `main`;
-2. optionally create the annotated tag `phase-8-accepted`;
-3. do not start Phase 9 until explicitly requested.
+`phase-8-accepted`
+
+Phase 8 is closed. Do not start Phase 9 until explicitly requested.
 
 ---
 
