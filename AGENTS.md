@@ -1,120 +1,76 @@
-# AGENTS.md — permanent rules for coding agents
+# AGENTS.md
 
-Permanent operating rules for every agent working in this repository.
-Phase-specific work is defined in `docs/PHASE_N.md`; current state lives in
-`AGENT_HANDOFF.md`.
+Repository-wide instructions for AI coding agents and reviewers.
 
-## Project
+## Start here
 
-`form-agent` — deterministic-first, AI-assisted Google Forms structural analysis
-and authorized test automation, delivered in numbered phases (0-8). The CLI is
-the interface; SQLite is the local store; a provider-neutral LLM layer is used
-only where deterministic logic is insufficient.
+Before changing code:
 
-## Architecture (high level)
+1. Read `docs/PROJECT_STATE.md`.
+2. Read `docs/AI_REVIEW_PROTOCOL.md`.
+3. Read the current phase specification referenced by `PROJECT_STATE.md`.
+4. Inspect:
+   - `git branch --show-current`
+   - `git rev-parse HEAD`
+   - `git status --short`
+   - `git diff --cached --name-only`
+5. Treat Git, repository files, specifications, and tests as authoritative.
+   Previous chat/session memory is supplemental only.
 
-- `src/domain/` — provider-neutral, pure, dependency-free types
-  (`FormSchema`, questions, sections/routing, fingerprints, semantic/profile/
-  answer models). No I/O, no LLM, no DB here.
-- `src/config/` — Zod config schema, env loading, file discovery/merge.
-- `src/cli/` — exit-code contract + command handlers.
-- `src/db/` — `better-sqlite3` connection (WAL, FK on) + migration catalog.
-- `src/llm/` — `ChatCompletionClient` interface + deterministic `FakeProvider`.
-- `src/logging/` — redaction + structured, sensitive-field-aware logger.
-- `src/fixtures/` — inline fixtures, archive loader, and the real-payload
-  decoder/sanitizer.
-- `bin/form-agent.js` — CLI launcher (uses `dist/`, falls back to TS source).
-- `tests/` — vitest unit/integration tests. `fixtures/archives/` — archived
-  real fixture used as a regression source of truth.
+If repository state conflicts with `PROJECT_STATE.md`, stop and report
+the mismatch instead of guessing.
 
-Phases add tables to the migration catalog — **never** by editing existing
-migrations.
+## Change discipline
 
-## Standard commands
+- Work only within the current phase/task.
+- Do not edit a frozen phase specification unless explicitly requested.
+- Do not reset, clean, stash, discard, rebase, or overwrite existing work
+  unless explicitly authorized.
+- Do not commit or push unless explicitly requested.
+- Preserve already accepted behavior.
+- Prefer the smallest change that closes a finding.
+- Avoid unrelated dependency churn.
+- Never commit real credentials, tokens, secrets, personal identifiers,
+  or production configuration.
 
-```bash
-npm test            # full regression suite (vitest run)
-npm run typecheck   # tsc --noEmit
-npm run build       # tsc -> dist/
+## Verification discipline
 
-# targeted development loop
-npx vitest run tests/<file>.test.ts
+Never claim a test or verification passed unless it was actually run
+against the relevant state.
 
-# CLI smoke
-node bin/form-agent.js --version
-node bin/form-agent.js analyze <url-or-fixture>
-```
+If a requirement explicitly requires a real external runtime, a stub,
+mock, synthetic package, or plain import is not equivalent proof.
 
-Fixture tooling (regenerate archived real fixture artifacts):
+If required evidence cannot be produced because an environment/runtime
+is unavailable, report `BLOCKED`, not `PASS`.
 
-```bash
-npm run fixture:sanitize -- <captured.html>
-npm run fixture:decode
-```
+Use these status terms consistently:
 
-## Source of truth
+- `FIXED`
+- `NOT FIXED`
+- `BLOCKED`
+- `PASS`
+- `FAIL`
 
-Repository code, tests, and git history are the source of truth. Documentation
-describes intent; if documentation and repository evidence disagree, **repository
-evidence wins** — report the discrepancy rather than coding to the prose.
+## Safety boundaries
 
-## Accepted baselines are not re-audited
+Automated tests and verification must not:
 
-Accepted Git baselines (see `AGENT_HANDOFF.md` for the current one) must **not**
-be broadly re-audited, and completed phases must **not** be reimplemented.
+- use real Telegram credentials;
+- send real Telegram messages;
+- perform real Google Form submissions;
+- mutate a production OpenClaw configuration;
+- leak provider/API secrets.
 
-Only reopen completed work when there is concrete evidence:
+## Final reports
 
-1. a relevant regression test fails,
-2. the current phase directly depends on a conflicting interface, or
-3. repository evidence contradicts the documented baseline.
+Implementation/review reports should include:
 
-When that happens, fix the specific conflict; do not re-do the whole phase.
-
-## Workflow rules
-
-- Work on **one phase only**.
-- Read the current `docs/PHASE_N.md` **before** implementation.
-- Maintain a visible TODO list for the current phase; keep exactly one item in
-  progress where practical.
-- Do not add scope unless a concrete dependency requires it.
-- Inspect only files relevant to the current task unless evidence requires
-  broader inspection.
-- Use targeted tests while developing.
-- Do not re-run the full regression suite after every edit; run it as a final
-  acceptance check.
-- Do not repeat the same command or investigation without new evidence.
-- If multiple distinct attempts at the same blocker produce no progress, stop
-  and report `BLOCKED` instead of looping.
-- If several consecutive actions produce no new evidence, code change, test
-  change, or diagnosis, stop and report.
-- Never automatically begin the next phase.
-- Never treat the agent's own statement that something works as proof — provide
-  executable evidence.
-
-## Phase acceptance rule
-
-A phase is complete only when its documented acceptance criteria have
-**verifiable evidence**. The final phase report must map requirements to
-evidence, e.g.:
-
-```
-P1-R1 PASS -> tests/phase1-parser.test.ts
-P1-R2 PASS -> tests/phase1-fixture-golden.test.ts
-```
-
-and must report:
-
-- targeted test results
-- full regression result
-- typecheck result
-- build result
-- known limitations
-- `git status`
-
-## Git
-
-- Do not commit accepted-phase baselines automatically unless explicitly
-  instructed by the user.
-- Keep the working tree free of unrelated edits; do not reformat or refactor
-  outside the current phase.
+- branch and Git baseline;
+- files changed;
+- findings fixed;
+- findings still open or blocked;
+- exact verification commands and outcomes;
+- whether the index/working tree is dirty;
+- whether a commit/push was performed;
+- exact next action.

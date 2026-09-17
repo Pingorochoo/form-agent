@@ -1,0 +1,31 @@
+Continue the Form Agent project from repository evidence.
+
+Repository:
+https://github.com/Pingorochoo/form-agent
+
+Do not rely on memory from previous ChatGPT conversations.
+
+Before recommending or changing anything, inspect branch `phase/8` and read:
+
+1. `AGENTS.md`
+2. `docs/PROJECT_STATE.md`
+3. `docs/AI_REVIEW_PROTOCOL.md`
+4. the current phase specification named by `PROJECT_STATE.md`
+5. the current branch diff against `main`
+6. relevant implementation/tests
+
+Then tell me:
+
+- current phase;
+- last accepted state/baseline;
+- current branch/checkpoint;
+- what is already fixed or accepted;
+- what remains unresolved or blocked;
+- exact next action.
+
+If repository evidence is missing or conflicts, identify the problem
+instead of guessing.
+
+For the current Phase 8 state, do not broadly rewrite implementation.
+Finding R — real OpenClaw 2026.9.4 runtime verification — is the
+remaining blocker unless repository evidence says otherwise.
