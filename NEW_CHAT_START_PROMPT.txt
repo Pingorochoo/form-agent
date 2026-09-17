@@ -5,27 +5,29 @@ https://github.com/Pingorochoo/form-agent
 
 Do not rely on memory from previous ChatGPT conversations.
 
-Before recommending or changing anything, inspect branch `phase/8` and read:
+Before recommending or changing anything, inspect the current development
+branch and read, in this order:
 
 1. `AGENTS.md`
-2. `docs/PROJECT_STATE.md`
+2. `AGENT_HANDOFF.md`
 3. `docs/AI_REVIEW_PROTOCOL.md`
-4. the current phase specification named by `PROJECT_STATE.md`
-5. the current branch diff against `main`
-6. relevant implementation/tests
+4. the current phase specification referenced by `AGENT_HANDOFF.md`
+5. current Git branch/history/diff against the relevant accepted baseline
+6. relevant implementation and tests
 
-Then tell me:
+Then report:
 
 - current phase;
-- last accepted state/baseline;
+- last accepted implementation baseline;
 - current branch/checkpoint;
 - what is already fixed or accepted;
 - what remains unresolved or blocked;
 - exact next action.
 
-If repository evidence is missing or conflicts, identify the problem
-instead of guessing.
+If repository evidence is missing or conflicts with documentation, identify the
+mismatch rather than guessing from assumed previous-chat context.
 
-For the current Phase 8 state, do not broadly rewrite implementation.
-Finding R — real OpenClaw 2026.9.4 runtime verification — is the
-remaining blocker unless repository evidence says otherwise.
+Follow `AGENT_HANDOFF.md` as the canonical current-state handoff, subject to
+repository evidence.
+
+Do not automatically start a new phase.
