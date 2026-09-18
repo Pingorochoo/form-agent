@@ -7,7 +7,7 @@ Phase-specific work is defined in `docs/PHASE_N.md`; current state lives in
 ## Project
 
 `form-agent` — deterministic-first, AI-assisted Google Forms structural analysis
-and authorized test automation, delivered in numbered phases (0-8). The CLI is
+and authorized test automation, delivered in numbered phases (0-9). The CLI is
 the interface; SQLite is the local store; a provider-neutral LLM layer is used
 only where deterministic logic is insufficient.
 
