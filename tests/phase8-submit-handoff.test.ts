@@ -352,6 +352,20 @@ describe('strict adapter envelope validation (N8-N12)', () => {
     ).toBe(false);
   });
 
+  it('N11b: submit usage_error still requires the strict terminal exit/data contract', () => {
+    expect(
+      validateAdapterEnvelope(
+        strictEnvelope({
+          category: 'usage_error',
+          status: 'error',
+          formAgentExitCode: null,
+          data: {},
+        }),
+        'submit_pending',
+      ),
+    ).toBe(false);
+  });
+
   it('N12: arbitrary object shaped like an envelope is rejected', () => {
     expect(validateAdapterEnvelope({ hello: 'world' }, 'submit_pending')).toBe(false);
     expect(validateAdapterEnvelope(strictEnvelope({ category: 'made_up' }), 'submit_pending')).toBe(false);

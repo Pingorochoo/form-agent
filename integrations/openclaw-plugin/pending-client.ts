@@ -226,12 +226,18 @@ export function validateAdapterEnvelope(
   const exitCode = value['formAgentExitCode'];
   if (exitCode !== null && (typeof exitCode !== 'number' || !Number.isInteger(exitCode))) return false;
 
-  const terminal = TERMINAL_SUBMIT_CONTRACT.get(category);
-  if (terminal !== undefined) {
-    if (exitCode !== terminal.exitCode) return false;
-    // Closed terminal `data` shape (Findings Q): null placeholders/extra keys
-    // are rejected at the plugin boundary too.
-    if (!validateTerminalData(category, value['data'])) return false;
+  // The frozen terminal exit/data contract belongs exclusively to
+  // `submit_pending`. Categories such as `usage_error` are also valid for
+  // non-submit operations, where they intentionally carry no submit-terminal
+  // exit/data shape.
+  if (expectedOperation === 'submit_pending') {
+    const terminal = TERMINAL_SUBMIT_CONTRACT.get(category);
+    if (terminal !== undefined) {
+      if (exitCode !== terminal.exitCode) return false;
+      // Closed terminal `data` shape (Findings Q): null placeholders/extra keys
+      // are rejected at the plugin boundary too.
+      if (!validateTerminalData(category, value['data'])) return false;
+    }
   }
   if (category === 'submit_start_failed' && exitCode !== null) return false;
 

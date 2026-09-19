@@ -37,6 +37,54 @@ describe('operation -> category contract (D1)', () => {
     expect(validateAdapterEnvelope(envelope(), 'analyze')).toBe(true);
   });
 
+  it('accepts non-submit usage_error envelopes without submit-terminal fields through PendingClient', async () => {
+    const runner = new FakeRunner();
+    const client = new PendingClient(CLIENT_CONFIG, runner);
+
+    runner.enqueue(
+      exitResult(
+        0,
+        JSON.stringify(
+          envelope({
+            operation: 'analyze',
+            status: 'error',
+            category: 'usage_error',
+            formAgentExitCode: null,
+            data: {},
+          }),
+        ),
+      ),
+    );
+    const analyze = await client.formAgent(PRINCIPAL, {
+      operation: 'analyze',
+      target: 'demo-fixture',
+    });
+    expect(analyze.ok).toBe(true);
+    if (analyze.ok) expect(analyze.envelope.category).toBe('usage_error');
+
+    runner.enqueue(
+      exitResult(
+        0,
+        JSON.stringify(
+          envelope({
+            operation: 'draft',
+            status: 'error',
+            category: 'usage_error',
+            formAgentExitCode: null,
+            data: {},
+          }),
+        ),
+      ),
+    );
+    const draft = await client.formAgent(PRINCIPAL, {
+      operation: 'draft',
+      target: 'demo-fixture',
+      draftProvider: 'reference',
+    });
+    expect(draft.ok).toBe(true);
+    if (draft.ok) expect(draft.envelope.category).toBe('usage_error');
+  });
+
   it('rejects a globally-valid but operation-impossible category', () => {
     // ok_submit_success / needs_confirmation are globally known but impossible
     // for `analyze`; ok_analyze is impossible for `submit_pending`.
