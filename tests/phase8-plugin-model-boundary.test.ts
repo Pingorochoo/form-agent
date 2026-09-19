@@ -189,3 +189,54 @@ describe('submit_ack envelope closure (E)', () => {
     expect((await ackWith(ackEnvelope({ data: { acked: true, idempotent: false, extra: 1 } }))).ok).toBe(false);
   });
 });
+
+describe('PendingClient submit timeout boundary', () => {
+  it('keeps submit_pending outside the full adapter submit window while status remains 10s', async () => {
+    const runner = new FakeRunner();
+    const client = new PendingClient(CLIENT_CONFIG, runner);
+
+    runner.enqueue(exitResult(0, '{}'));
+    await client.submitPending(PRINCIPAL, {
+      pendingId: 'a'.repeat(32),
+      planId: 'b'.repeat(64),
+      targetKey: 'fixture:demo-fixture',
+      targetDisplay: 'demo-fixture',
+      expiresAtMs: 1_800_000_000_000,
+    });
+
+    expect(runner.calls).toHaveLength(1);
+    expect(runner.calls[0]?.timeoutMs).toBe(315_000);
+
+    runner.enqueue(exitResult(0, '{}'));
+    await client.submitStatus(PRINCIPAL, {
+      pendingRef: 'a'.repeat(32),
+      planId: 'b'.repeat(64),
+    });
+
+    expect(runner.calls).toHaveLength(2);
+    expect(runner.calls[1]?.timeoutMs).toBe(10_000);
+  });
+
+  it('preserves a caller timeout when it is longer than the safe submit boundary', async () => {
+    const runner = new FakeRunner();
+    const client = new PendingClient(
+      {
+        ...CLIENT_CONFIG,
+        timeoutMs: 600_000,
+      },
+      runner,
+    );
+
+    runner.enqueue(exitResult(0, '{}'));
+    await client.submitPending(PRINCIPAL, {
+      pendingId: 'a'.repeat(32),
+      planId: 'b'.repeat(64),
+      targetKey: 'fixture:demo-fixture',
+      targetDisplay: 'demo-fixture',
+      expiresAtMs: 1_800_000_000_000,
+    });
+
+    expect(runner.calls).toHaveLength(1);
+    expect(runner.calls[0]?.timeoutMs).toBe(600_000);
+  });
+});

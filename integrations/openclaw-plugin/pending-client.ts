@@ -15,6 +15,7 @@ import {
 import {
   ADAPTER_CATEGORIES,
   ADAPTER_VERSION,
+  OPERATION_TIMEOUTS,
   TERMINAL_SUBMIT_CONTRACT,
   isAllowedProviderEnvName,
   statusForCategory,
@@ -68,6 +69,16 @@ export interface AdapterCallOptions {
 }
 
 const ADAPTER_CONFIG_ENV = 'FORM_AGENT_OPENCLAW_CONFIG';
+
+/**
+ * `submit_pending` may legitimately run for the full adapter submit timeout.
+ * The plugin-side subprocess bound must therefore be strictly longer so the
+ * adapter has time to complete timeout handling, durable state updates, and
+ * emit its terminal envelope instead of being killed by the outer runner.
+ */
+const SUBMIT_PENDING_OUTER_GRACE_MS = 15_000;
+const SUBMIT_PENDING_OUTER_TIMEOUT_MS =
+  (OPERATION_TIMEOUTS['submit_pending'] as number) + SUBMIT_PENDING_OUTER_GRACE_MS;
 
 const PENDING_ID_RE = /^[0-9a-f]{32}$/;
 const PLAN_ID_RE = /^[0-9a-f]{64}$/;
@@ -461,7 +472,13 @@ export class PendingClient {
         '--expires-at',
         String(pending.expiresAtMs),
       ],
-      { expectedOperation: 'submit_pending' },
+      {
+        timeoutMs: Math.max(
+          this.config.timeoutMs ?? 0,
+          SUBMIT_PENDING_OUTER_TIMEOUT_MS,
+        ),
+        expectedOperation: 'submit_pending',
+      },
     );
   }
 }
