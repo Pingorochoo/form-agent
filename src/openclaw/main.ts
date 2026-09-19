@@ -114,8 +114,12 @@ export function parseAdapterArgv(argv: string[]): ParseOutcome {
       i += 1;
     }
 
-    if (field === 'channel' || field === 'accountId' || field === 'senderId' || field === 'conversationId') {
+    if (field === 'channel' || field === 'accountId' || field === 'senderId') {
       principal[field] = value;
+      continue;
+    }
+    if (field === 'conversationId') {
+      input.conversationId = value;
       continue;
     }
     if (field === 'expiresAtMs') {

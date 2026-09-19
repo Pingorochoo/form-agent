@@ -85,6 +85,39 @@ describe('pending record', () => {
     fixture.cleanup();
   });
 
+  it('persists conversationId outside the durable principal and remains readable by a fresh store', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'form-agent-p8-conversation-'));
+
+    const writer = new PendingStore({ dataDir: dir });
+    const created = writer.create({
+      principal: PRINCIPAL,
+      conversationId: 'telegram',
+      targetKey: 'fixture:demo-fixture',
+      targetArg: 'demo-fixture',
+      targetDisplay: 'demo-fixture',
+      planId: 'a'.repeat(64),
+      seed: 'b'.repeat(32),
+      operator: 'telegram:5550001',
+    });
+
+    expect(created.principal).toEqual(PRINCIPAL);
+    expect('conversationId' in created.principal).toBe(false);
+    expect(created.conversationId).toBe('telegram');
+
+    // Simulates the next short-lived adapter process reading persisted state.
+    const reader = new PendingStore({ dataDir: dir });
+    const reloaded = reader.read(PRINCIPAL);
+
+    expect(reloaded).not.toBeNull();
+    expect(reloaded?.pendingId).toBe(created.pendingId);
+    expect(reloaded?.principal).toEqual(PRINCIPAL);
+    expect('conversationId' in (reloaded?.principal ?? {})).toBe(false);
+    expect(reloaded?.conversationId).toBe('telegram');
+
+    expect(reader.cancel(PRINCIPAL).pendingId).toBe(created.pendingId);
+    expect(reader.read(PRINCIPAL)).toBeNull();
+  });
+
   it('detects a corrupt pending file', () => {
     const dir = mkdtempSync(join(tmpdir(), 'form-agent-p8-corrupt-'));
     const store = new PendingStore({ dataDir: dir });

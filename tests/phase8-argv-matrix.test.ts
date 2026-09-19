@@ -137,6 +137,31 @@ describe('adapter-only review flag', () => {
   });
 });
 
+describe('conversation id argv separation', () => {
+  it('keeps --conversation out of the durable principal and in adapter input', () => {
+    const parsed = parseAdapterArgv([
+      'preflight',
+      '--target', 'https://fixtures.local/forms/exec-success',
+      '--draft-provider', 'reference',
+      '--channel', 'telegram',
+      '--account', 'formagent',
+      '--sender', '5550001',
+      '--conversation', 'telegram',
+    ]);
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    expect(parsed.value.principal).toEqual({
+      channel: 'telegram',
+      accountId: 'formagent',
+      senderId: '5550001',
+    });
+    expect('conversationId' in parsed.value.principal).toBe(false);
+    expect(parsed.value.input.conversationId).toBe('telegram');
+  });
+});
+
 describe('reconcile-unknown operator CLI alias', () => {
   it('maps the dashed spelling to the internal operation and not to the model enum', () => {
     const dashed = parseAdapterArgv([
