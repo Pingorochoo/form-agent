@@ -13,7 +13,8 @@
  *   - `definePluginEntry` from `openclaw/plugin-sdk/plugin-entry`
  *   - `api.registerTool(factory, { name, optional })`
  *   - `api.on("before_tool_call", handler, { matcher: ["form_agent_submit"] })`
- *   - hook `params` are snapshotted with the approval and applied after it succeeds
+ *   - `before_tool_call` and tool execution share the host-owned `toolCallId`
+ *   - approval resolution callbacks are host-owned and fail closed
  *   - `ctx.requester` provides channel/accountId/senderId
  *   - tool factories provide `requesterSenderId` / `nativeChannelId` / `delivery`
  */
@@ -28,6 +29,10 @@ import {
   type ApprovalSnapshotParams,
   type PendingApprovalView,
 } from './approval-hook.ts';
+import {
+  ApprovalSnapshotGate,
+  isApprovalToolCallId,
+} from './approval-snapshot-gate.ts';
 import {
   PendingClient,
   extractReviewValues,
@@ -74,31 +79,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function readApprovalParams(params: unknown): ApprovalSnapshotParams | null {
-  if (!isRecord(params)) return null;
-  const principal = params['principal'];
-  if (!isRecord(principal)) return null;
-  if (principal['channel'] !== 'telegram') return null;
-  if (typeof principal['accountId'] !== 'string' || typeof principal['senderId'] !== 'string') return null;
-  if (typeof params['pendingRef'] !== 'string') return null;
-  if (typeof params['planId'] !== 'string') return null;
-  if (typeof params['targetKey'] !== 'string') return null;
-  if (typeof params['targetDisplay'] !== 'string') return null;
-  if (typeof params['expiresAtMs'] !== 'number') return null;
-  return {
-    pendingRef: params['pendingRef'],
-    principal: {
-      channel: 'telegram',
-      accountId: principal['accountId'],
-      senderId: principal['senderId'],
-    },
-    planId: params['planId'],
-    targetKey: params['targetKey'],
-    targetDisplay: params['targetDisplay'],
-    expiresAtMs: params['expiresAtMs'],
-  };
-}
-
 function pendingViewOf(envelope: AdapterEnvelope): PendingApprovalView | null {
   const data = envelope.data;
   const pending = data['pending'];
@@ -141,6 +121,9 @@ export default definePluginEntry({
     // instance. It outlives every short-lived adapter subprocess, so a failed
     // durable barrier in one adapter call fences later calls in the session.
     const hardRecovery = new HardRecoveryLatch();
+    // Approval snapshots are host-owned and process-local. They never enter the
+    // model-visible tool arguments.
+    const approvalSnapshots = new ApprovalSnapshotGate();
 
     api.registerTool(
       (toolContext: any) => {
@@ -245,12 +228,20 @@ export default definePluginEntry({
           description:
             'Submit the already-registered pending Form Agent plan. Requires host-mediated operator approval; carries zero model parameters.',
           parameters: Type.Object({}),
-          async execute(_toolCallId: string, params: unknown) {
+          async execute(toolCallId: string, params: unknown) {
             if (!principalResult.ok) {
               return textResult('Request not authorized.', { category: 'unauthorized', status: 'blocked' });
             }
+            // Defense in depth: the model-facing submit contract remains
+            // strictly zero-parameter even after host approval.
+            if (!isRecord(params) || Object.keys(params).length !== 0) {
+              return textResult('Request rejected: invalid arguments.', {
+                category: 'usage_error',
+                status: 'error',
+              });
+            }
             const principal: PluginPrincipal = principalResult.principal;
-            const snapshot = readApprovalParams(params);
+            const snapshot = approvalSnapshots.consumeApproved(toolCallId, Date.now());
             if (snapshot === null) {
               return textResult('No approved pending submission.', { category: 'no_pending', status: 'blocked' });
             }
@@ -273,21 +264,62 @@ export default definePluginEntry({
       'before_tool_call',
       async (event: any, ctx: any) => {
         if (event?.toolName !== 'form_agent_submit') return;
+        if (!isApprovalToolCallId(event?.toolCallId)) {
+          return { block: true, blockReason: 'Form Agent submission not authorized.' };
+        }
+        // Do not even offer an approval for a model call that attempted to
+        // supply submit arguments. The public submit schema is zero-parameter.
+        if (!isRecord(event?.params) || Object.keys(event.params).length !== 0) {
+          return { block: true, blockReason: 'Form Agent submission not authorized.' };
+        }
+
+        const toolCallId: string = event.toolCallId;
         const principalResult = deriveToolPrincipal(config, {
           requesterSenderId: ctx?.requester?.senderId,
         });
         if (!principalResult.ok) {
           return { block: true, blockReason: 'Form Agent submission not authorized.' };
         }
+
         const status = await client.pendingStatus(principalResult.principal);
         const view = status.ok ? pendingViewOf(status.envelope) : null;
-        return buildSubmitApproval({
+        const nowMs = Date.now();
+        const approval = buildSubmitApproval({
           view,
           config,
           toolPrincipal: principalResult.principal,
           hookRequester: ctx?.requester,
-          nowMs: Date.now(),
+          nowMs,
         });
+        if ('block' in approval) return approval;
+
+        const approvalToken = approvalSnapshots.register(
+          toolCallId,
+          approval.params,
+          nowMs,
+        );
+        if (approvalToken === null) {
+          return { block: true, blockReason: 'Form Agent submission not authorized.' };
+        }
+
+        // Do NOT return approval.params here. OpenClaw merges hook params into
+        // the model tool arguments after approval. The snapshot remains
+        // host-owned and is transported only by the host-generated toolCallId.
+        return {
+          requireApproval: {
+            ...approval.requireApproval,
+            onResolution: (resolution: unknown) => {
+              // Deliberately synchronous. OpenClaw invokes onResolution before
+              // it continues an allowed tool call.
+              approvalSnapshots.resolve(
+                toolCallId,
+                approvalToken,
+                resolution,
+                Date.now(),
+              );
+            },
+          },
+        };
       },
       { matcher: ['form_agent_submit'], priority: 50 },
     );

@@ -7,6 +7,7 @@
   "files": [
     "index.ts",
     "approval-hook.ts",
+    "approval-snapshot-gate.ts",
     "pending-client.ts",
     "principal.ts",
     "model-visible.ts",
